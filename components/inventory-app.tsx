@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
 import {
   AlertTriangle,
   Archive,
@@ -24,9 +23,14 @@ import {
 import { MetricCard } from "@/components/metric-card";
 import { StatusPill } from "@/components/status-pill";
 import type { AuditLogRow, CategoryRow, ProductRow, PurchaseOrderRow, StockMovementRow, SupplierRow } from "@/lib/db-types";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { ProductStatus } from "@/lib/types";
 import { cn, currency, number } from "@/lib/utils";
+
+type StaffUser = {
+  id: string;
+  username: string;
+  role: string;
+};
 
 type Filter = "all" | "low" | "expiring" | "orders";
 type ProductForm = {
@@ -91,7 +95,7 @@ function toNumber(value: string, fallback = 0) {
 }
 
 export function InventoryApp() {
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<StaffUser | null>(null);
   const [authMode, setAuthMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -130,31 +134,39 @@ export function InventoryApp() {
   });
 
   const selectedProduct = products.find((product) => product.id === selectedProductId) ?? products[0];
-  const authEmail = `${username.trim().toLowerCase()}@gmail.com`;
 
   useEffect(() => {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-    });
-
-    return () => listener.subscription.unsubscribe();
+    fetch("/api/auth/me")
+      .then((response) => response.json())
+      .then((data) => {
+        setUser(data.user);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
-    if (session) {
+    if (user) {
       void loadData();
     }
-  }, [session]);
+    // loadData intentionally reads current component state after login.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  async function apiRequest(path: string, body?: unknown) {
+    const response = await fetch(path, {
+      method: body ? "POST" : "GET",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "Request failed.");
+    return data;
+  }
+
 
   useEffect(() => {
     if (!selectedProductId && products.length > 0) {
@@ -206,31 +218,19 @@ export function InventoryApp() {
   );
 
   async function loadData() {
-    if (!supabase) return;
-
     setLoading(true);
     setMessage("");
 
-    const [productResult, categoryResult, supplierResult, movementResult, orderResult, logResult] = await Promise.all([
-      supabase.from("products").select("*, categories(name), suppliers(name)").eq("status", "active").order("name"),
-      supabase.from("categories").select("*").order("name"),
-      supabase.from("suppliers").select("*").order("name"),
-      supabase.from("stock_movements").select("*, products(name, sku)").order("created_at", { ascending: false }).limit(50),
-      supabase.from("purchase_orders").select("*, suppliers(name)").order("created_at", { ascending: false }).limit(20),
-      supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(20)
-    ]);
-
-    const error = productResult.error ?? categoryResult.error ?? supplierResult.error ?? movementResult.error ?? orderResult.error ?? logResult.error;
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setProducts((productResult.data ?? []) as ProductRow[]);
-      setCategories((categoryResult.data ?? []) as CategoryRow[]);
-      setSuppliers((supplierResult.data ?? []) as SupplierRow[]);
-      setMovements((movementResult.data ?? []) as StockMovementRow[]);
-      setOrders((orderResult.data ?? []) as PurchaseOrderRow[]);
-      setLogs((logResult.data ?? []) as AuditLogRow[]);
+    try {
+      const data = await apiRequest("/api/inventory");
+      setProducts((data.products ?? []) as ProductRow[]);
+      setCategories((data.categories ?? []) as CategoryRow[]);
+      setSuppliers((data.suppliers ?? []) as SupplierRow[]);
+      setMovements((data.movements ?? []) as StockMovementRow[]);
+      setOrders((data.orders ?? []) as PurchaseOrderRow[]);
+      setLogs((data.logs ?? []) as AuditLogRow[]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load inventory.");
     }
 
     setLoading(false);
@@ -238,7 +238,6 @@ export function InventoryApp() {
 
   async function handleAuth(event: FormEvent) {
     event.preventDefault();
-    if (!supabase) return;
 
     setSaving(true);
     setMessage("");
@@ -249,100 +248,37 @@ export function InventoryApp() {
       return;
     }
 
-    const result =
-      authMode === "sign-in"
-        ? await supabase.auth.signInWithPassword({ email: authEmail, password })
-        : await supabase.auth.signUp({
-            email: authEmail,
-            password,
-            options: {
-              data: {
-                username: username.trim().toLowerCase(),
-                full_name: username.trim()
-              }
-            }
-          });
-
-    if (result.error) {
-      setMessage(result.error.message);
-    } else {
-      setMessage(authMode === "sign-up" ? "Account created. You can sign in with your username and password." : "Signed in.");
+    try {
+      const data = await apiRequest(authMode === "sign-in" ? "/api/auth/login" : "/api/auth/signup", {
+        username,
+        password
+      });
+      setUser(data.user);
+      setMessage(authMode === "sign-up" ? "Account created." : "Signed in.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to sign in.");
     }
 
     setSaving(false);
   }
 
   async function signOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    await apiRequest("/api/auth/logout", {});
+    setUser(null);
     setProducts([]);
     setMovements([]);
     setOrders([]);
     setLogs([]);
   }
 
-  async function ensureCategory(name: string) {
-    if (!supabase || !name.trim()) return null;
-    const existing = categories.find((category) => category.name.toLowerCase() === name.trim().toLowerCase());
-    if (existing) return existing.id;
-    const { data, error } = await supabase.from("categories").insert({ name: name.trim() }).select("id").single();
-    if (error) throw error;
-    return data.id as string;
-  }
-
-  async function ensureSupplier(name: string) {
-    if (!supabase || !name.trim()) return null;
-    const existing = suppliers.find((supplier) => supplier.name.toLowerCase() === name.trim().toLowerCase());
-    if (existing) return existing.id;
-    const { data, error } = await supabase.from("suppliers").insert({ name: name.trim() }).select("id").single();
-    if (error) throw error;
-    return data.id as string;
-  }
-
-  async function addAudit(action: string, detail: string, entityType?: string, entityId?: string) {
-    if (!supabase) return;
-    await supabase.from("audit_logs").insert({
-      action,
-      detail,
-      entity_type: entityType ?? null,
-      entity_id: entityId ?? null
-    });
-  }
-
   async function saveProduct(event: FormEvent) {
     event.preventDefault();
-    if (!supabase) return;
 
     setSaving(true);
     setMessage("");
 
     try {
-      const categoryId = await ensureCategory(productForm.categoryName);
-      const supplierId = await ensureSupplier(productForm.supplierName);
-      const payload = {
-        name: productForm.name.trim(),
-        sku: productForm.sku.trim(),
-        barcode: productForm.barcode.trim() || null,
-        brand: productForm.brand.trim() || null,
-        category_id: categoryId,
-        supplier_id: supplierId,
-        unit: productForm.unit.trim() || "pcs",
-        stock: toNumber(productForm.stock),
-        reorder_level: toNumber(productForm.reorderLevel),
-        par_level: toNumber(productForm.parLevel),
-        cost: toNumber(productForm.cost),
-        price: toNumber(productForm.price),
-        expiry_date: productForm.expiryDate || null,
-        location: productForm.location.trim() || null
-      };
-
-      const result = productForm.id
-        ? await supabase.from("products").update(payload).eq("id", productForm.id).select("id").single()
-        : await supabase.from("products").insert(payload).select("id").single();
-
-      if (result.error) throw result.error;
-
-      await addAudit(productForm.id ? "Product updated" : "Product created", `${payload.name} was saved in the catalog.`, "products", result.data.id);
+      await apiRequest("/api/products", productForm);
       setProductForm(emptyProductForm);
       await loadData();
       setMessage("Product saved.");
@@ -355,27 +291,12 @@ export function InventoryApp() {
 
   async function recordMovement(event: FormEvent) {
     event.preventDefault();
-    if (!supabase) return;
 
     setSaving(true);
     setMessage("");
 
-    const product = products.find((item) => item.id === movementForm.productId);
-    const rawQuantity = Math.abs(toNumber(movementForm.quantity, 1));
-    const signedQuantity = movementForm.type === "restock" || movementForm.type === "return" ? rawQuantity : -rawQuantity;
-
     try {
-      const { error } = await supabase.from("stock_movements").insert({
-        product_id: movementForm.productId,
-        type: movementForm.type,
-        quantity: signedQuantity,
-        reason: movementForm.reason.trim() || movementLabels[movementForm.type],
-        reference: movementForm.reference.trim() || null
-      });
-
-      if (error) throw error;
-
-      await addAudit("Stock movement recorded", `${product?.name ?? "A product"} changed by ${signedQuantity}.`, "products", movementForm.productId);
+      await apiRequest("/api/movements", movementForm);
       setMovementForm({ productId: selectedProduct?.id ?? "", type: "restock", quantity: "1", reason: "", reference: "" });
       await loadData();
       setMessage("Stock movement saved and product stock updated.");
@@ -388,27 +309,17 @@ export function InventoryApp() {
 
   async function saveSupplier(event: FormEvent) {
     event.preventDefault();
-    if (!supabase) return;
 
     setSaving(true);
     setMessage("");
 
-    const { error } = await supabase.from("suppliers").insert({
-      name: supplierForm.name.trim(),
-      contact: supplierForm.contact.trim() || null,
-      phone: supplierForm.phone.trim() || null,
-      email: supplierForm.email.trim() || null,
-      lead_time_days: toNumber(supplierForm.leadTimeDays, 1),
-      reliability: 100
-    });
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      await addAudit("Supplier created", `${supplierForm.name} was added as a supplier.`, "suppliers");
+    try {
+      await apiRequest("/api/suppliers", supplierForm);
       setSupplierForm({ name: "", contact: "", phone: "", email: "", leadTimeDays: "1" });
       await loadData();
       setMessage("Supplier saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to save supplier.");
     }
 
     setSaving(false);
@@ -416,31 +327,17 @@ export function InventoryApp() {
 
   async function saveOrder(event: FormEvent) {
     event.preventDefault();
-    if (!supabase) return;
 
     setSaving(true);
     setMessage("");
 
-    const poNumber = `PO-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${String(orders.length + 1).padStart(3, "0")}`;
-    const { data, error } = await supabase
-      .from("purchase_orders")
-      .insert({
-        po_number: poNumber,
-        supplier_id: orderForm.supplierId || null,
-        status: orderForm.status,
-        expected_date: orderForm.expectedDate || null,
-        total: toNumber(orderForm.total)
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      await addAudit("Purchase order created", `${poNumber} was created.`, "purchase_orders", data.id);
+    try {
+      await apiRequest("/api/orders", orderForm);
       setOrderForm({ supplierId: "", status: "draft", expectedDate: "", total: "0" });
       await loadData();
       setMessage("Purchase order saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to save purchase order.");
     }
 
     setSaving(false);
@@ -467,18 +364,7 @@ export function InventoryApp() {
     });
   }
 
-  if (!isSupabaseConfigured) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-paper p-4">
-        <div className="max-w-lg rounded-lg border border-black/10 bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-bold">Supabase is not configured</h1>
-          <p className="mt-3 text-sm text-zinc-600">Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel, then redeploy.</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!session) {
+  if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-paper p-4">
         <form onSubmit={handleAuth} className="w-full max-w-md rounded-lg border border-black/10 bg-white p-6 shadow-sm">
