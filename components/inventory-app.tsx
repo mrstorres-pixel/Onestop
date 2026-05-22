@@ -96,7 +96,6 @@ function toNumber(value: string, fallback = 0) {
 
 export function InventoryApp() {
   const [user, setUser] = useState<StaffUser | null>(null);
-  const [authMode, setAuthMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(true);
@@ -249,12 +248,12 @@ export function InventoryApp() {
     }
 
     try {
-      const data = await apiRequest(authMode === "sign-in" ? "/api/auth/login" : "/api/auth/signup", {
+      const data = await apiRequest("/api/auth/login", {
         username,
         password
       });
       setUser(data.user);
-      setMessage(authMode === "sign-up" ? "Account created." : "Signed in.");
+      setMessage("Signed in.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to sign in.");
     }
@@ -374,7 +373,7 @@ export function InventoryApp() {
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-leaf">Onestop Minimart</p>
-              <h1 className="text-2xl font-bold">{authMode === "sign-in" ? "Sign in" : "Create account"}</h1>
+              <h1 className="text-2xl font-bold">Sign in</h1>
             </div>
           </div>
           <div className="mt-6 space-y-3">
@@ -384,10 +383,7 @@ export function InventoryApp() {
           {message ? <p className="mt-4 rounded-md bg-paper p-3 text-sm text-zinc-700">{message}</p> : null}
           <button className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white hover:bg-emerald-700" disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <ShieldCheck className="h-4 w-4" aria-hidden />}
-            {authMode === "sign-in" ? "Sign in" : "Create account"}
-          </button>
-          <button type="button" className="mt-3 w-full text-sm font-semibold text-leaf" onClick={() => setAuthMode(authMode === "sign-in" ? "sign-up" : "sign-in")}>
-            {authMode === "sign-in" ? "Need an account? Create one" : "Already have an account? Sign in"}
+            Sign in
           </button>
         </form>
       </main>

@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "create-user": "node scripts/create-staff-user.mjs",
     "lint": "next lint"
   },
   "dependencies": {
