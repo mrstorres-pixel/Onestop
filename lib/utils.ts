@@ -1,12 +1,12 @@
 export function currency(value: number) {
-  return new Intl.NumberFormat("en-SG", {
+  return new Intl.NumberFormat("en-PH", {
     style: "currency",
-    currency: "SGD"
+    currency: "PHP"
   }).format(value);
 }
 
 export function number(value: number) {
-  return new Intl.NumberFormat("en-SG").format(value);
+  return new Intl.NumberFormat("en-PH").format(value);
 }
 
 export function cn(...classes: Array<string | false | null | undefined>) {
