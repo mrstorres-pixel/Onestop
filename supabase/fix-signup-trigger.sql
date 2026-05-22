@@ -1,11 +1,7 @@
-alter table profiles add column if not exists username text unique;
-
-update profiles
-set username = lower(regexp_replace(full_name, '[^a-zA-Z0-9_]+', '', 'g'))
-where username is null;
-
 drop trigger if exists create_profile_after_signup on auth.users;
 drop function if exists create_profile_for_new_user();
+
+alter table profiles add column if not exists username text unique;
 
 drop policy if exists "Users can read profiles" on profiles;
 create policy "Users can read profiles" on profiles for select to authenticated using (true);
