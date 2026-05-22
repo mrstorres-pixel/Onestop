@@ -130,7 +130,7 @@ export function InventoryApp() {
   });
 
   const selectedProduct = products.find((product) => product.id === selectedProductId) ?? products[0];
-  const authEmail = `${username.trim().toLowerCase()}@onestop.local`;
+  const authEmail = `${username.trim().toLowerCase()}@users.onestopinventory.app`;
 
   useEffect(() => {
     if (!supabase) {
