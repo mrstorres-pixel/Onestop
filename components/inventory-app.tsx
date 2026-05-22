@@ -93,7 +93,7 @@ function toNumber(value: string, fallback = 0) {
 export function InventoryApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [authMode, setAuthMode] = useState<"sign-in" | "sign-up">("sign-in");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -130,6 +130,7 @@ export function InventoryApp() {
   });
 
   const selectedProduct = products.find((product) => product.id === selectedProductId) ?? products[0];
+  const authEmail = `${username.trim().toLowerCase()}@onestop.local`;
 
   useEffect(() => {
     if (!supabase) {
@@ -242,15 +243,30 @@ export function InventoryApp() {
     setSaving(true);
     setMessage("");
 
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(username.trim())) {
+      setMessage("Username must be 3 to 30 characters and use only letters, numbers, or underscores.");
+      setSaving(false);
+      return;
+    }
+
     const result =
       authMode === "sign-in"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        ? await supabase.auth.signInWithPassword({ email: authEmail, password })
+        : await supabase.auth.signUp({
+            email: authEmail,
+            password,
+            options: {
+              data: {
+                username: username.trim().toLowerCase(),
+                full_name: username.trim()
+              }
+            }
+          });
 
     if (result.error) {
       setMessage(result.error.message);
     } else {
-      setMessage(authMode === "sign-up" ? "Account created. If email confirmation is enabled, check your inbox before signing in." : "Signed in.");
+      setMessage(authMode === "sign-up" ? "Account created. You can sign in with your username and password." : "Signed in.");
     }
 
     setSaving(false);
@@ -476,7 +492,7 @@ export function InventoryApp() {
             </div>
           </div>
           <div className="mt-6 space-y-3">
-            <input className="h-11 w-full rounded-md border border-black/10 px-3 text-sm outline-none ring-leaf/20 focus:ring-4" placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input className="h-11 w-full rounded-md border border-black/10 px-3 text-sm outline-none ring-leaf/20 focus:ring-4" placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} required autoCapitalize="none" autoComplete="username" />
             <input className="h-11 w-full rounded-md border border-black/10 px-3 text-sm outline-none ring-leaf/20 focus:ring-4" placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} />
           </div>
           {message ? <p className="mt-4 rounded-md bg-paper p-3 text-sm text-zinc-700">{message}</p> : null}
