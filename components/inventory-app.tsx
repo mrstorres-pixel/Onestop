@@ -240,6 +240,24 @@ export function InventoryApp() {
     setSaving(false);
   }
 
+  async function archiveProduct() {
+    if (!productForm.id) return;
+    const confirmed = window.confirm("Archive this product? It will be removed from active inventory, but history and invoices will stay intact.");
+    if (!confirmed) return;
+
+    setSaving(true);
+    setMessage("");
+    try {
+      await apiRequest("/api/products/archive", { id: productForm.id });
+      setProductForm(emptyProductForm);
+      await loadData();
+      setMessage("Product archived.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to archive product.");
+    }
+    setSaving(false);
+  }
+
   async function saveCategory(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -505,7 +523,7 @@ export function InventoryApp() {
                 </table>
               </div>
             </section>
-            <ProductEditor form={productForm} setForm={setProductForm} categories={categories} suppliers={suppliers} saving={saving} onSubmit={saveProduct} onReset={() => setProductForm(emptyProductForm)} />
+            <ProductEditor form={productForm} setForm={setProductForm} categories={categories} suppliers={suppliers} saving={saving} onSubmit={saveProduct} onReset={() => setProductForm(emptyProductForm)} onArchive={archiveProduct} />
           </div>
         ) : null}
 
@@ -626,7 +644,8 @@ function ProductEditor({
   suppliers,
   saving,
   onSubmit,
-  onReset
+  onReset,
+  onArchive
 }: {
   form: ProductForm;
   setForm: (form: ProductForm) => void;
@@ -635,6 +654,7 @@ function ProductEditor({
   saving: boolean;
   onSubmit: (event: FormEvent) => void;
   onReset: () => void;
+  onArchive: () => void;
 }) {
   return (
     <form onSubmit={onSubmit} className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
@@ -667,6 +687,12 @@ function ProductEditor({
         {form.id ? (
           <button type="button" onClick={onReset} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
             Add new instead
+          </button>
+        ) : null}
+        {form.id ? (
+          <button type="button" onClick={onArchive} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:border-rose-300" disabled={saving}>
+            <Trash2 className="h-4 w-4" aria-hidden />
+            Archive product
           </button>
         ) : null}
       </div>
