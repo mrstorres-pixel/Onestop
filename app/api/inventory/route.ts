@@ -9,7 +9,7 @@ export async function GET() {
   const today = new Date().toISOString().slice(0, 10);
   await adminSupabase
     .from("products")
-    .update({ status: "archived", stock: 0 })
+    .update({ status: "archived" })
     .eq("status", "active")
     .not("expiry_date", "is", null)
     .lte("expiry_date", today);
