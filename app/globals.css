@@ -25,3 +25,13 @@ select {
 ::selection {
   background: #dff5e8;
 }
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

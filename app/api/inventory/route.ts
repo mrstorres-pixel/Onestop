@@ -6,16 +6,24 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!adminSupabase) return NextResponse.json({ error: "Server database is not configured." }, { status: 500 });
 
-  const [productResult, categoryResult, supplierResult, movementResult, orderResult, logResult] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  await adminSupabase
+    .from("products")
+    .update({ status: "archived", stock: 0 })
+    .eq("status", "active")
+    .not("expiry_date", "is", null)
+    .lte("expiry_date", today);
+
+  const [productResult, categoryResult, supplierResult, movementResult, logResult, expiredResult] = await Promise.all([
     adminSupabase.from("products").select("*, categories(name), suppliers(name)").eq("status", "active").order("name"),
     adminSupabase.from("categories").select("*").order("name"),
     adminSupabase.from("suppliers").select("*").order("name"),
     adminSupabase.from("stock_movements").select("*, products(name, sku)").order("created_at", { ascending: false }).limit(50),
-    adminSupabase.from("purchase_orders").select("*, suppliers(name)").order("created_at", { ascending: false }).limit(20),
-    adminSupabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(20)
+    adminSupabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(30),
+    adminSupabase.from("products").select("id, name, expiry_date").eq("status", "archived").eq("expiry_date", today).limit(20)
   ]);
 
-  const error = productResult.error ?? categoryResult.error ?? supplierResult.error ?? movementResult.error ?? orderResult.error ?? logResult.error;
+  const error = productResult.error ?? categoryResult.error ?? supplierResult.error ?? movementResult.error ?? logResult.error ?? expiredResult.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   return NextResponse.json({
@@ -23,7 +31,7 @@ export async function GET() {
     categories: categoryResult.data ?? [],
     suppliers: supplierResult.data ?? [],
     movements: movementResult.data ?? [],
-    orders: orderResult.data ?? [],
-    logs: logResult.data ?? []
+    logs: logResult.data ?? [],
+    expiredToday: expiredResult.data ?? []
   });
 }

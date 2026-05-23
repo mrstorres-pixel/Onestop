@@ -30,10 +30,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const categoryId = await ensureCategory(String(body.categoryName ?? ""));
     const supplierId = await ensureSupplier(String(body.supplierName ?? ""));
+    const barcode = String(body.barcode ?? "").trim();
+    const generatedSku = barcode || String(body.name ?? "product").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || `sku-${Date.now()}`;
     const payload = {
       name: String(body.name ?? "").trim(),
-      sku: String(body.sku ?? "").trim(),
-      barcode: String(body.barcode ?? "").trim() || null,
+      sku: String(body.sku ?? "").trim() || generatedSku,
+      barcode: barcode || null,
       brand: String(body.brand ?? "").trim() || null,
       category_id: categoryId,
       supplier_id: supplierId,

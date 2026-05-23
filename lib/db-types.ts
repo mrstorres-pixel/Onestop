@@ -49,17 +49,6 @@ export type StockMovementRow = {
   products?: { name: string; sku: string } | null;
 };
 
-export type PurchaseOrderRow = {
-  id: string;
-  po_number: string;
-  supplier_id: string | null;
-  status: "draft" | "sent" | "partial" | "received" | "cancelled";
-  expected_date: string | null;
-  total: number;
-  created_at: string;
-  suppliers?: { name: string } | null;
-};
-
 export type AuditLogRow = {
   id: string;
   action: string;
@@ -67,4 +56,29 @@ export type AuditLogRow = {
   entity_type: string | null;
   entity_id: string | null;
   created_at: string;
+};
+
+export type SaleItem = {
+  product_id: string;
+  product_name: string;
+  barcode: string | null;
+  expiry_date: string | null;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+};
+
+export type SaleInvoice = {
+  id: string;
+  invoice_no: string;
+  buyer_name: string;
+  buyer_address: string | null;
+  buyer_phone: string | null;
+  payment_method: string;
+  subtotal: number;
+  vat_rate: number;
+  vat_amount: number;
+  total: number;
+  created_at: string;
+  items: SaleItem[];
 };
