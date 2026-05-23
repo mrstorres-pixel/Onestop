@@ -347,29 +347,29 @@ export function InventoryApp() {
   return (
     <main className="min-h-screen bg-paper">
       <header className="no-print border-b border-black/10 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-5 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-ink text-white">
-                <Boxes className="h-6 w-6" aria-hidden />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ink text-white sm:h-12 sm:w-12">
+                <Boxes className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold uppercase tracking-wide text-leaf">Onestop Minimart</p>
-                <h1 className="text-2xl font-bold tracking-normal text-ink sm:text-3xl">Inventory System</h1>
+                <h1 className="text-xl font-bold tracking-normal text-ink sm:text-3xl">Inventory System</h1>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-md border border-black/10 bg-paper px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <button onClick={() => void loadData()} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 bg-paper px-3 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
                 <RefreshCw className="h-4 w-4" aria-hidden />
                 Refresh
               </button>
-              <button onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-berry hover:text-berry">
+              <button onClick={() => void signOut()} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 bg-white px-3 text-sm font-semibold text-zinc-700 hover:border-berry hover:text-berry">
                 <LogOut className="h-4 w-4" aria-hidden />
                 Sign out
               </button>
             </div>
           </div>
-          <nav className="flex gap-2 overflow-x-auto">
+          <nav className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0">
             {nav.map(([key, Icon, label]) => (
               <button key={key} onClick={() => setTab(key)} className={cn("inline-flex h-10 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-semibold", tab === key ? "border-leaf bg-mint text-leaf" : "border-black/10 bg-white text-zinc-700 hover:border-leaf hover:text-leaf")}>
                 <Icon className="h-4 w-4" aria-hidden />
@@ -381,7 +381,7 @@ export function InventoryApp() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
         {tab === "dashboard" ? (
           <div className="space-y-5">
             <section className="grid gap-4 lg:grid-cols-4">
@@ -449,7 +449,29 @@ export function InventoryApp() {
                   </div>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 p-3 md:hidden">
+                {filteredProducts.map((product) => (
+                  <button key={product.id} onClick={() => editProduct(product)} className="w-full rounded-lg border border-black/10 bg-white p-3 text-left shadow-sm hover:border-leaf">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-ink">{product.name}</p>
+                        <p className="mt-1 break-all text-xs text-zinc-500">{product.barcode ?? "No barcode"}</p>
+                      </div>
+                      <StatusPill status={getProductStatus(product)} />
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <p><span className="block text-xs text-zinc-500">Category</span>{product.categories?.name ?? "-"}</p>
+                      <p><span className="block text-xs text-zinc-500">Supplier</span>{product.suppliers?.name ?? "-"}</p>
+                      <p><span className="block text-xs text-zinc-500">Stock</span><strong>{product.stock}</strong></p>
+                      <p><span className="block text-xs text-zinc-500">Expiry</span>{product.expiry_date ?? "-"}</p>
+                      <p><span className="block text-xs text-zinc-500">Capital</span>{currency(Number(product.cost))}</p>
+                      <p><span className="block text-xs text-zinc-500">Selling</span>{currency(Number(product.price))}</p>
+                    </div>
+                  </button>
+                ))}
+                {!filteredProducts.length ? <p className="rounded-md bg-paper p-3 text-sm text-zinc-500">No products found.</p> : null}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[900px] border-collapse text-left text-sm">
                   <thead className="bg-paper text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
@@ -558,9 +580,9 @@ export function InventoryApp() {
                 <Tags className="h-5 w-5 text-leaf" aria-hidden />
                 <h2 className="text-lg font-bold">Categories</h2>
               </div>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
                 <input className={inputClass("w-full")} placeholder="Category name" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} />
-                <button className="inline-flex h-10 items-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white" disabled={saving}><Plus className="h-4 w-4" aria-hidden />Add</button>
+                <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white" disabled={saving}><Plus className="h-4 w-4" aria-hidden />Add</button>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {categories.map((category) => <span key={category.id} className="rounded-md border border-black/10 bg-paper px-3 py-2 text-sm font-semibold">{category.name}</span>)}
@@ -578,7 +600,7 @@ export function InventoryApp() {
                 <input className={inputClass()} placeholder="Email" value={supplierForm.email} onChange={(event) => setSupplierForm({ ...supplierForm, email: event.target.value })} />
                 <input className={inputClass()} placeholder="Lead time days" type="number" value={supplierForm.leadTimeDays} onChange={(event) => setSupplierForm({ ...supplierForm, leadTimeDays: event.target.value })} />
               </div>
-              <button className="mt-4 inline-flex h-10 items-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white" disabled={saving}><Save className="h-4 w-4" aria-hidden />Save supplier</button>
+              <button className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white sm:w-auto" disabled={saving}><Save className="h-4 w-4" aria-hidden />Save supplier</button>
               <div className="mt-4 space-y-2">
                 {suppliers.map((supplier) => <p key={supplier.id} className="rounded-md border border-black/10 p-3 text-sm"><strong>{supplier.name}</strong><br />{supplier.contact ?? "No contact"} / {supplier.phone ?? "No phone"}</p>)}
               </div>
@@ -637,13 +659,13 @@ function ProductEditor({
           <input className={inputClass("w-full")} type="number" step="0.01" min="0" placeholder="Selling price" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} />
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button className="inline-flex h-10 items-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white hover:bg-emerald-700" disabled={saving}>
+      <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
+        <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white hover:bg-emerald-700" disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Save className="h-4 w-4" aria-hidden />}
           Save product
         </button>
         {form.id ? (
-          <button type="button" onClick={onReset} className="inline-flex h-10 items-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+          <button type="button" onClick={onReset} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
             Add new instead
           </button>
         ) : null}
@@ -666,14 +688,14 @@ function InvoiceView({ invoice }: { invoice: SaleInvoice | null }) {
   const totalQty = invoice.items.reduce((total, item) => total + item.quantity, 0);
 
   return (
-    <section className="mx-auto max-w-5xl bg-white p-6 shadow-sm print:shadow-none">
+    <section className="mx-auto max-w-5xl overflow-x-auto bg-white p-3 shadow-sm sm:p-6 print:overflow-visible print:shadow-none">
       <div className="no-print mb-4 flex justify-end">
         <button onClick={() => window.print()} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white">
           <Printer className="h-4 w-4" aria-hidden />
           Print
         </button>
       </div>
-      <div className="border-2 border-black p-5 text-black">
+      <div className="min-w-[820px] border-2 border-black p-5 text-black print:min-w-0">
         <div className="grid grid-cols-[1fr_auto] gap-4">
           <div>
             <p className="text-xl">[Company] <span className="ml-6 text-base">[ONE STOP]</span></p>
