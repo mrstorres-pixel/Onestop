@@ -2,13 +2,21 @@ create extension if not exists "uuid-ossp";
 
 create type product_status as enum ('active', 'archived');
 create type movement_type as enum ('sale', 'restock', 'adjustment', 'return', 'waste');
-create type purchase_order_status as enum ('draft', 'sent', 'partial', 'received', 'cancelled');
 
-create table profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  full_name text not null,
-  username text unique,
+create table staff_users (
+  id uuid primary key default uuid_generate_v4(),
+  username text not null unique,
+  password_salt text not null,
+  password_hash text not null,
   role text not null default 'staff',
+  created_at timestamptz not null default now()
+);
+
+create table staff_sessions (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references staff_users(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
   created_at timestamptz not null default now()
 );
 
@@ -37,12 +45,12 @@ create table products (
   brand text,
   category_id uuid references categories(id),
   supplier_id uuid references suppliers(id),
-  unit text not null default 'each',
+  unit text not null default 'pcs',
   stock integer not null default 0,
   reorder_level integer not null default 0,
   par_level integer not null default 0,
-  cost numeric(10, 2) not null default 0,
-  price numeric(10, 2) not null default 0,
+  cost numeric(12, 2) not null default 0,
+  price numeric(12, 2) not null default 0,
   expiry_date date,
   location text,
   status product_status not null default 'active',
@@ -57,27 +65,34 @@ create table stock_movements (
   quantity integer not null,
   reason text not null,
   reference text,
-  created_by uuid references profiles(id),
   created_at timestamptz not null default now()
 );
 
-create table purchase_orders (
+create table wholesale_sales (
   id uuid primary key default uuid_generate_v4(),
-  po_number text not null unique,
-  supplier_id uuid references suppliers(id),
-  status purchase_order_status not null default 'draft',
-  expected_date date,
-  total numeric(10, 2) not null default 0,
-  created_by uuid references profiles(id),
+  invoice_no text not null unique,
+  buyer_name text not null,
+  buyer_address text,
+  buyer_phone text,
+  payment_method text not null default 'Cash',
+  subtotal numeric(12, 2) not null default 0,
+  vat_rate numeric(5, 2) not null default 0,
+  vat_amount numeric(12, 2) not null default 0,
+  total numeric(12, 2) not null default 0,
+  created_by uuid references staff_users(id),
   created_at timestamptz not null default now()
 );
 
-create table purchase_order_items (
+create table wholesale_sale_items (
   id uuid primary key default uuid_generate_v4(),
-  purchase_order_id uuid not null references purchase_orders(id) on delete cascade,
-  product_id uuid not null references products(id),
+  sale_id uuid not null references wholesale_sales(id) on delete cascade,
+  product_id uuid references products(id),
+  product_name text not null,
+  barcode text,
+  expiry_date date,
   quantity integer not null,
-  unit_cost numeric(10, 2) not null default 0
+  unit_price numeric(12, 2) not null,
+  subtotal numeric(12, 2) not null
 );
 
 create table audit_logs (
@@ -86,39 +101,24 @@ create table audit_logs (
   detail text not null,
   entity_type text,
   entity_id uuid,
-  created_by uuid references profiles(id),
   created_at timestamptz not null default now()
 );
 
-alter table profiles enable row level security;
-alter table suppliers enable row level security;
-alter table categories enable row level security;
-alter table products enable row level security;
-alter table stock_movements enable row level security;
-alter table purchase_orders enable row level security;
-alter table purchase_order_items enable row level security;
-alter table audit_logs enable row level security;
+insert into categories (name)
+values ('Consumable'), ('Non-consumable')
+on conflict (name) do nothing;
 
-create policy "Authenticated users can read inventory" on products for select to authenticated using (true);
-create policy "Authenticated users can manage inventory" on products for all to authenticated using (true) with check (true);
-create policy "Authenticated users can read suppliers" on suppliers for select to authenticated using (true);
-create policy "Authenticated users can manage suppliers" on suppliers for all to authenticated using (true) with check (true);
-create policy "Authenticated users can read categories" on categories for select to authenticated using (true);
-create policy "Authenticated users can manage categories" on categories for all to authenticated using (true) with check (true);
-create policy "Authenticated users can read movements" on stock_movements for select to authenticated using (true);
-create policy "Authenticated users can add movements" on stock_movements for insert to authenticated with check (true);
-create policy "Authenticated users can read purchase orders" on purchase_orders for select to authenticated using (true);
-create policy "Authenticated users can manage purchase orders" on purchase_orders for all to authenticated using (true) with check (true);
-create policy "Authenticated users can read purchase order items" on purchase_order_items for select to authenticated using (true);
-create policy "Authenticated users can manage purchase order items" on purchase_order_items for all to authenticated using (true) with check (true);
-create policy "Authenticated users can read audit logs" on audit_logs for select to authenticated using (true);
-create policy "Authenticated users can add audit logs" on audit_logs for insert to authenticated with check (true);
+create index staff_sessions_token_hash_idx on staff_sessions(token_hash);
+create index staff_sessions_expires_at_idx on staff_sessions(expires_at);
+create index products_expiry_status_idx on products(status, expiry_date);
+create index wholesale_sales_invoice_no_idx on wholesale_sales(invoice_no);
+create index wholesale_sale_items_sale_id_idx on wholesale_sale_items(sale_id);
 
 create or replace function update_product_stock()
 returns trigger as $$
 begin
   update products
-  set stock = stock + new.quantity,
+  set stock = greatest(stock + new.quantity, 0),
       updated_at = now()
   where id = new.product_id;
   return new;
@@ -128,6 +128,3 @@ $$ language plpgsql security definer;
 create trigger stock_movement_updates_product
 after insert on stock_movements
 for each row execute procedure update_product_stock();
-
-create policy "Users can read profiles" on profiles for select to authenticated using (true);
-create policy "Users can update own profile" on profiles for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);

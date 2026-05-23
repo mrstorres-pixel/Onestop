@@ -32,3 +32,14 @@ create table if not exists wholesale_sale_items (
 create index if not exists wholesale_sales_invoice_no_idx on wholesale_sales(invoice_no);
 create index if not exists wholesale_sale_items_sale_id_idx on wholesale_sale_items(sale_id);
 create index if not exists products_expiry_status_idx on products(status, expiry_date);
+
+create or replace function update_product_stock()
+returns trigger as $$
+begin
+  update products
+  set stock = greatest(stock + new.quantity, 0),
+      updated_at = now()
+  where id = new.product_id;
+  return new;
+end;
+$$ language plpgsql security definer;

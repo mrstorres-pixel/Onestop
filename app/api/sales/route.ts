@@ -17,6 +17,11 @@ export async function POST(request: Request) {
   if (!items.length) return NextResponse.json({ error: "Add at least one product to the sale." }, { status: 400 });
 
   const productIds = items.map((item) => item.productId);
+  const requestedByProduct = items.reduce<Record<string, number>>((totals, item) => {
+    totals[item.productId] = (totals[item.productId] ?? 0) + Math.max(1, Number(item.quantity ?? 1));
+    return totals;
+  }, {});
+
   const { data: products, error: productError } = await adminSupabase
     .from("products")
     .select("id, name, barcode, expiry_date, stock")
@@ -29,7 +34,7 @@ export async function POST(request: Request) {
     saleItems = items.map((item) => {
       const product = products?.find((row) => row.id === item.productId);
       if (!product) throw new Error("One selected product no longer exists.");
-      if (Number(product.stock) < Number(item.quantity)) throw new Error(`${product.name} only has ${product.stock} in stock.`);
+      if (Number(product.stock) < requestedByProduct[item.productId]) throw new Error(`${product.name} only has ${product.stock} in stock.`);
       const quantity = Math.max(1, Number(item.quantity));
       const unitPrice = Math.max(0, Number(item.unitPrice));
       return {

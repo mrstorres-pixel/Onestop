@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   BarChart3,
   Boxes,
-  FileClock,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -25,8 +24,7 @@ import {
 } from "lucide-react";
 import { MetricCard } from "@/components/metric-card";
 import { StatusPill } from "@/components/status-pill";
-import type { AuditLogRow, CategoryRow, ProductRow, SaleInvoice, StockMovementRow, SupplierRow } from "@/lib/db-types";
-import type { ProductStatus } from "@/lib/types";
+import type { AuditLogRow, CategoryRow, ProductRow, ProductStatus, SaleInvoice, SupplierRow } from "@/lib/db-types";
 import { cn, currency, number } from "@/lib/utils";
 
 type StaffUser = { id: string; username: string; role: string };
@@ -98,7 +96,6 @@ export function InventoryApp() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
-  const [movements, setMovements] = useState<StockMovementRow[]>([]);
   const [logs, setLogs] = useState<AuditLogRow[]>([]);
   const [expiredToday, setExpiredToday] = useState<Array<{ id: string; name: string; expiry_date: string }>>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -150,7 +147,6 @@ export function InventoryApp() {
       setProducts(data.products ?? []);
       setCategories(data.categories ?? []);
       setSuppliers(data.suppliers ?? []);
-      setMovements(data.movements ?? []);
       setLogs(data.logs ?? []);
       setExpiredToday(data.expiredToday ?? []);
     } catch (error) {
@@ -202,7 +198,6 @@ export function InventoryApp() {
     await apiRequest("/api/auth/logout", {});
     setUser(null);
     setProducts([]);
-    setMovements([]);
     setLogs([]);
   }
 
@@ -488,7 +483,7 @@ export function InventoryApp() {
                 </table>
               </div>
             </section>
-            <ProductEditor form={productForm} setForm={setProductForm} categories={categories} suppliers={suppliers} saving={saving} onSubmit={saveProduct} />
+            <ProductEditor form={productForm} setForm={setProductForm} categories={categories} suppliers={suppliers} saving={saving} onSubmit={saveProduct} onReset={() => setProductForm(emptyProductForm)} />
           </div>
         ) : null}
 
@@ -608,7 +603,8 @@ function ProductEditor({
   categories,
   suppliers,
   saving,
-  onSubmit
+  onSubmit,
+  onReset
 }: {
   form: ProductForm;
   setForm: (form: ProductForm) => void;
@@ -616,6 +612,7 @@ function ProductEditor({
   suppliers: SupplierRow[];
   saving: boolean;
   onSubmit: (event: FormEvent) => void;
+  onReset: () => void;
 }) {
   return (
     <form onSubmit={onSubmit} className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
@@ -640,10 +637,17 @@ function ProductEditor({
           <input className={inputClass("w-full")} type="number" step="0.01" min="0" placeholder="Selling price" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} />
         </div>
       </div>
-      <button className="mt-4 inline-flex h-10 items-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white hover:bg-emerald-700" disabled={saving}>
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Save className="h-4 w-4" aria-hidden />}
-        Save product
-      </button>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button className="inline-flex h-10 items-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white hover:bg-emerald-700" disabled={saving}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Save className="h-4 w-4" aria-hidden />}
+          Save product
+        </button>
+        {form.id ? (
+          <button type="button" onClick={onReset} className="inline-flex h-10 items-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+            Add new instead
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }

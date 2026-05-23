@@ -4,6 +4,8 @@ export type CategoryRow = {
   created_at: string;
 };
 
+export type ProductStatus = "healthy" | "low" | "critical" | "out";
+
 export type SupplierRow = {
   id: string;
   name: string;
@@ -36,17 +38,6 @@ export type ProductRow = {
   updated_at: string;
   categories?: { name: string } | null;
   suppliers?: { name: string } | null;
-};
-
-export type StockMovementRow = {
-  id: string;
-  product_id: string;
-  type: "sale" | "restock" | "adjustment" | "return" | "waste";
-  quantity: number;
-  reason: string;
-  reference: string | null;
-  created_at: string;
-  products?: { name: string; sku: string } | null;
 };
 
 export type AuditLogRow = {

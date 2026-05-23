@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, CircleSlash, TrendingDown } from "lucide-react";
-import type { ProductStatus } from "@/lib/types";
+import type { ProductStatus } from "@/lib/db-types";
 import { cn } from "@/lib/utils";
 
 const config = {
