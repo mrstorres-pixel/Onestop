@@ -432,15 +432,11 @@ export function InventoryApp() {
           <div className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
             <section className="rounded-lg border border-black/10 bg-white shadow-sm">
               <div className="space-y-3 border-b border-black/10 p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-2">
                   <div>
                     <h2 className="text-lg font-bold">Products</h2>
-                    <p className="text-sm text-zinc-500">Name, category, supplier, barcode, expiry, capital, and selling price.</p>
+                    <p className="text-sm text-zinc-500">Select a row to edit it, or use the form on the right to add a product.</p>
                   </div>
-                  <button onClick={() => setProductForm(emptyProductForm)} className="inline-flex items-center gap-2 rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
-                    <PackagePlus className="h-4 w-4" aria-hidden />
-                    New product
-                  </button>
                 </div>
                 <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
                   <label className="relative block">
