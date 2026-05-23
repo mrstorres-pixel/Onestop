@@ -399,7 +399,7 @@ export function InventoryApp() {
               <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
                 <h2 className="text-lg font-bold">Expiry Alerts</h2>
                 <div className="mt-4 space-y-3">
-                  {expiredToday.length ? <p className="rounded-md bg-rose-50 p-3 text-sm font-semibold text-rose-700">{expiredToday.length} expired product(s) were automatically removed from active inventory today.</p> : null}
+                  {expiredToday.length ? <p className="rounded-md bg-rose-50 p-3 text-sm font-semibold text-rose-700">{expiredToday.length} expired product(s) had their remaining quantity deducted today.</p> : null}
                   {metrics.expiring.length === 0 ? <p className="text-sm text-zinc-500">No products are close to expiry.</p> : null}
                   {metrics.expiring.map((product) => (
                     <button key={product.id} onClick={() => editProduct(product)} className="flex w-full items-center justify-between rounded-md border border-black/10 p-3 text-left hover:border-leaf">
@@ -597,7 +597,7 @@ export function InventoryApp() {
                 <SlidersHorizontal className="h-5 w-5 text-leaf" aria-hidden />
                 <h2 className="text-lg font-bold">Admin Notes</h2>
               </div>
-              <p className="mt-3 text-sm text-zinc-600">Default product categories are Consumable and Non-consumable. Expired products are archived automatically when the system loads inventory. Public account creation is disabled; create staff users from the local admin script.</p>
+              <p className="mt-3 text-sm text-zinc-600">Default product categories are Consumable and Non-consumable. Expired products stay in the catalog, but their remaining quantity is automatically deducted through a waste movement. Public account creation is disabled; create staff users from the local admin script.</p>
             </section>
           </div>
         ) : null}
