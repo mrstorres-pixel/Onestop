@@ -22,6 +22,18 @@ select {
   font: inherit;
 }
 
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+button,
+select,
+input {
+  touch-action: manipulation;
+}
+
 ::selection {
   background: #dff5e8;
 }

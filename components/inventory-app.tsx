@@ -608,7 +608,7 @@ export function InventoryApp() {
         ) : null}
 
         {tab === "pos" ? (
-          <form onSubmit={createPosSale} className="grid gap-5 lg:grid-cols-[1fr_360px]">
+          <form onSubmit={createPosSale} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
             <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -621,27 +621,27 @@ export function InventoryApp() {
                 {posLines.map((line, index) => {
                   const product = products.find((item) => item.id === line.productId);
                   return (
-                    <div key={index} className="grid gap-2 rounded-md border border-black/10 p-3 md:grid-cols-[1fr_100px_130px_40px]">
-                      <select className={inputClass("w-full")} value={line.productId} onChange={(event) => updatePosLine(index, { productId: event.target.value })} required>
+                    <div key={index} className="grid gap-2 rounded-md border border-black/10 p-3 sm:grid-cols-[1fr_92px_120px_44px] lg:grid-cols-[1fr_110px_150px_44px]">
+                      <select className={inputClass("h-11 w-full")} value={line.productId} onChange={(event) => updatePosLine(index, { productId: event.target.value })} required>
                         <option value="">Select product</option>
                         {products.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.stock})</option>)}
                       </select>
-                      <input className={inputClass("w-full")} type="number" min="1" placeholder="Qty" value={line.quantity} onChange={(event) => updatePosLine(index, { quantity: event.target.value })} required />
-                      <input className={inputClass("w-full")} type="number" step="0.01" min="0" placeholder="Price" value={line.unitPrice} onChange={(event) => updatePosLine(index, { unitPrice: event.target.value })} required />
-                      <button type="button" onClick={() => setPosLines((current) => current.length > 1 ? current.filter((_, lineIndex) => lineIndex !== index) : current)} className="flex h-10 items-center justify-center rounded-md border border-black/10 text-zinc-500 hover:border-berry hover:text-berry" aria-label="Remove line">
+                      <input className={inputClass("h-11 w-full")} type="number" min="1" placeholder="Qty" value={line.quantity} onChange={(event) => updatePosLine(index, { quantity: event.target.value })} required />
+                      <input className={inputClass("h-11 w-full")} type="number" step="0.01" min="0" placeholder="Price" value={line.unitPrice} onChange={(event) => updatePosLine(index, { unitPrice: event.target.value })} required />
+                      <button type="button" onClick={() => setPosLines((current) => current.length > 1 ? current.filter((_, lineIndex) => lineIndex !== index) : current)} className="flex h-11 items-center justify-center rounded-md border border-black/10 text-zinc-500 hover:border-berry hover:text-berry" aria-label="Remove line">
                         <Trash2 className="h-4 w-4" aria-hidden />
                       </button>
-                      {product ? <p className="text-xs text-zinc-500 md:col-span-4">Stock {product.stock} / Barcode {product.barcode ?? "-"} / Expiry {product.expiry_date ?? "-"}</p> : null}
+                      {product ? <p className="text-xs text-zinc-500 sm:col-span-4">Stock {product.stock} / Barcode {product.barcode ?? "-"} / Expiry {product.expiry_date ?? "-"}</p> : null}
                     </div>
                   );
                 })}
               </div>
-              <button type="button" onClick={() => setPosLines((current) => [...current, { productId: "", quantity: "1", unitPrice: "0" }])} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf sm:w-auto">
+              <button type="button" onClick={() => setPosLines((current) => [...current, { productId: "", quantity: "1", unitPrice: "0" }])} className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf sm:w-auto">
                 <Plus className="h-4 w-4" aria-hidden />
                 Add item
               </button>
             </section>
-            <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+            <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm md:sticky md:top-4 md:self-start">
               <h2 className="text-lg font-bold">Sale Summary</h2>
               <div className="mt-5 space-y-2 border-t border-black/10 pt-4 text-sm">
                 <div className="flex justify-between text-lg"><span>Total</span><strong>{currency(posPreview)}</strong></div>
@@ -655,7 +655,7 @@ export function InventoryApp() {
         ) : null}
 
         {tab === "sell" ? (
-          <form onSubmit={createSale} className="grid gap-5 lg:grid-cols-[1fr_380px]">
+          <form onSubmit={createSale} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
             <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -673,27 +673,27 @@ export function InventoryApp() {
                 {saleLines.map((line, index) => {
                   const product = products.find((item) => item.id === line.productId);
                   return (
-                    <div key={index} className="grid gap-2 rounded-md border border-black/10 p-3 md:grid-cols-[1fr_100px_130px_40px]">
-                      <select className={inputClass("w-full")} value={line.productId} onChange={(event) => updateSaleLine(index, { productId: event.target.value })} required>
+                    <div key={index} className="grid gap-2 rounded-md border border-black/10 p-3 sm:grid-cols-[1fr_92px_120px_44px] lg:grid-cols-[1fr_110px_150px_44px]">
+                      <select className={inputClass("h-11 w-full")} value={line.productId} onChange={(event) => updateSaleLine(index, { productId: event.target.value })} required>
                         <option value="">Select product</option>
                         {products.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.stock})</option>)}
                       </select>
-                      <input className={inputClass("w-full")} type="number" min="1" placeholder="Qty" value={line.quantity} onChange={(event) => updateSaleLine(index, { quantity: event.target.value })} required />
-                      <input className={inputClass("w-full")} type="number" step="0.01" min="0" placeholder="Custom price" value={line.unitPrice} onChange={(event) => updateSaleLine(index, { unitPrice: event.target.value })} required />
-                      <button type="button" onClick={() => setSaleLines((current) => current.filter((_, lineIndex) => lineIndex !== index))} className="flex h-10 items-center justify-center rounded-md border border-black/10 text-zinc-500 hover:border-berry hover:text-berry" aria-label="Remove line">
+                      <input className={inputClass("h-11 w-full")} type="number" min="1" placeholder="Qty" value={line.quantity} onChange={(event) => updateSaleLine(index, { quantity: event.target.value })} required />
+                      <input className={inputClass("h-11 w-full")} type="number" step="0.01" min="0" placeholder="Custom price" value={line.unitPrice} onChange={(event) => updateSaleLine(index, { unitPrice: event.target.value })} required />
+                      <button type="button" onClick={() => setSaleLines((current) => current.length > 1 ? current.filter((_, lineIndex) => lineIndex !== index) : current)} className="flex h-11 items-center justify-center rounded-md border border-black/10 text-zinc-500 hover:border-berry hover:text-berry" aria-label="Remove line">
                         <Trash2 className="h-4 w-4" aria-hidden />
                       </button>
-                      {product ? <p className="text-xs text-zinc-500 md:col-span-4">Barcode {product.barcode ?? "-"} / Expiry {product.expiry_date ?? "-"} / Default {currency(Number(product.price))}</p> : null}
+                      {product ? <p className="text-xs text-zinc-500 sm:col-span-4">Barcode {product.barcode ?? "-"} / Expiry {product.expiry_date ?? "-"} / Default {currency(Number(product.price))}</p> : null}
                     </div>
                   );
                 })}
               </div>
-              <button type="button" onClick={() => setSaleLines((current) => [...current, { productId: "", quantity: "1", unitPrice: "0" }])} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+                <button type="button" onClick={() => setSaleLines((current) => [...current, { productId: "", quantity: "1", unitPrice: "0" }])} className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf sm:w-auto">
                 <Plus className="h-4 w-4" aria-hidden />
                 Add product
               </button>
             </section>
-            <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+              <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm md:sticky md:top-4 md:self-start">
               <h2 className="text-lg font-bold">Payment</h2>
               <div className="mt-4 space-y-3">
                 <select className={inputClass("w-full")} value={saleForm.paymentMethod} onChange={(event) => setSaleForm({ ...saleForm, paymentMethod: event.target.value })}>
