@@ -395,6 +395,23 @@ export function InventoryApp() {
     setSaving(false);
   }
 
+  async function voidSale(sale: SaleInvoice) {
+    const confirmed = window.confirm(`Void ${sale.invoice_no}? This will restore the sold quantities back into inventory.`);
+    if (!confirmed) return;
+
+    setSaving(true);
+    setMessage("");
+    try {
+      await apiRequest("/api/sales/void", { saleId: sale.id });
+      await loadData();
+      await loadSales();
+      setMessage(`${sale.invoice_no} was voided and inventory was restored.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to void transaction.");
+    }
+    setSaving(false);
+  }
+
   function updateSaleLine(index: number, patch: Partial<SaleLine>) {
     setSaleLines((current) =>
       current.map((line, lineIndex) => {
@@ -798,19 +815,32 @@ export function InventoryApp() {
                 Refresh
               </button>
             </div>
-            <div className="divide-y divide-black/10">
-              {invoices.map((sale) => (
-                <button key={sale.id} onClick={() => { setInvoice(sale); setTab("invoice"); }} className="grid w-full gap-2 p-4 text-left hover:bg-paper sm:grid-cols-[1fr_auto] sm:items-center">
-                  <div>
-                    <p className="font-semibold">{sale.invoice_no}</p>
-                    <p className="text-sm text-zinc-500">{sale.buyer_name} / {new Date(sale.created_at).toLocaleString("en-PH")}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{sale.items.length} item(s)</p>
+              <div className="divide-y divide-black/10">
+                {invoices.map((sale) => (
+                  <div key={sale.id} className="grid gap-3 p-4 hover:bg-paper sm:grid-cols-[1fr_auto] sm:items-center">
+                    <button type="button" onClick={() => { setInvoice(sale); setTab("invoice"); }} className="text-left">
+                      <p className="font-semibold">
+                        {sale.invoice_no}
+                        {sale.payment_method.startsWith("VOIDED") ? <span className="ml-2 rounded-md bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700">Voided</span> : null}
+                      </p>
+                      <p className="text-sm text-zinc-500">{sale.buyer_name} / {new Date(sale.created_at).toLocaleString("en-PH")}</p>
+                      <p className="mt-1 text-xs text-zinc-500">{sale.items.length} item(s) / {sale.payment_method}</p>
+                    </button>
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <strong className="mr-auto text-lg text-ink sm:mr-0">{currency(Number(sale.total))}</strong>
+                      <button type="button" onClick={() => { setInvoice(sale); setTab("invoice"); }} className="rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+                        Receipt
+                      </button>
+                      {!sale.payment_method.startsWith("VOIDED") ? (
+                        <button type="button" onClick={() => void voidSale(sale)} className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:border-rose-300" disabled={saving}>
+                          Void
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                  <strong className="text-lg text-ink">{currency(Number(sale.total))}</strong>
-                </button>
-              ))}
-              {!invoices.length ? <p className="p-4 text-sm text-zinc-500">No sales yet.</p> : null}
-            </div>
+                ))}
+                {!invoices.length ? <p className="p-4 text-sm text-zinc-500">No sales yet.</p> : null}
+              </div>
           </section>
         ) : null}
 
