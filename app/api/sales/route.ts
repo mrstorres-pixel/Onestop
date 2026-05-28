@@ -7,16 +7,50 @@ type SaleBodyItem = {
   unitPrice: number;
 };
 
-export async function GET() {
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 100;
+
+function parsePositiveInt(value: string | null, fallback: number, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(Math.floor(parsed), max);
+}
+
+function nextDate(value: string) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString();
+}
+
+export async function GET(request: Request) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!adminSupabase) return NextResponse.json({ error: "Server database is not configured." }, { status: 500 });
 
-  const { data: sales, error: salesError } = await adminSupabase
+  const { searchParams } = new URL(request.url);
+  const page = parsePositiveInt(searchParams.get("page"), 1);
+  const pageSize = parsePositiveInt(searchParams.get("pageSize"), DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  const startDate = searchParams.get("startDate");
+  const endDate = searchParams.get("endDate");
+  const saleType = searchParams.get("saleType");
+  const search = searchParams.get("search")?.trim();
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let salesQuery = adminSupabase
     .from("wholesale_sales")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false });
+
+  if (startDate) salesQuery = salesQuery.gte("created_at", `${startDate}T00:00:00.000Z`);
+  if (endDate) salesQuery = salesQuery.lt("created_at", nextDate(endDate));
+  if (saleType === "pos" || saleType === "wholesale") salesQuery = salesQuery.eq("sale_type", saleType);
+  if (search) {
+    const escaped = search.replaceAll("%", "\\%").replaceAll("_", "\\_");
+    salesQuery = salesQuery.or(`invoice_no.ilike.%${escaped}%,buyer_name.ilike.%${escaped}%,payment_method.ilike.%${escaped}%`);
+  }
+
+  const { data: sales, error: salesError, count } = await salesQuery.range(from, to);
 
   if (salesError) return NextResponse.json({ error: salesError.message }, { status: 400 });
 
@@ -41,7 +75,13 @@ export async function GET() {
           unit_price: item.unit_price,
           subtotal: item.subtotal
         }))
-    }))
+    })),
+    pagination: {
+      page,
+      pageSize,
+      total: count ?? 0,
+      totalPages: Math.max(1, Math.ceil((count ?? 0) / pageSize))
+    }
   });
 }
 

@@ -5,6 +5,9 @@ import {
   AlertTriangle,
   BarChart3,
   Boxes,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   LayoutDashboard,
   Loader2,
@@ -32,6 +35,14 @@ import { cn, currency, number } from "@/lib/utils";
 type StaffUser = { id: string; username: string; role: string };
 type Tab = "dashboard" | "products" | "pos" | "sell" | "sales" | "audit" | "invoice" | "settings";
 type ProductFilter = "all" | "low" | "expiring";
+type SaleTypeFilter = "all" | "pos" | "wholesale";
+
+type SalesPagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
 
 type ProductForm = {
   id?: string;
@@ -87,6 +98,14 @@ function inputClass(extra = "") {
   return cn("h-10 rounded-md border border-black/10 bg-white px-3 text-sm outline-none ring-leaf/20 focus:ring-4", extra);
 }
 
+function getSaleRevenue(sale: SaleInvoice) {
+  return sale.payment_method.startsWith("VOIDED") ? 0 : Number(sale.total);
+}
+
+function getSaleDayKey(date: string) {
+  return new Date(date).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+}
+
 export function InventoryApp() {
   const [user, setUser] = useState<StaffUser | null>(null);
   const [username, setUsername] = useState("");
@@ -118,6 +137,13 @@ export function InventoryApp() {
   });
   const [invoice, setInvoice] = useState<SaleInvoice | null>(null);
   const [invoices, setInvoices] = useState<SaleInvoice[]>([]);
+  const [salesPagination, setSalesPagination] = useState<SalesPagination>({ page: 1, pageSize: 25, total: 0, totalPages: 1 });
+  const [salesPage, setSalesPage] = useState(1);
+  const [salesPageSize, setSalesPageSize] = useState(25);
+  const [salesSearch, setSalesSearch] = useState("");
+  const [salesStartDate, setSalesStartDate] = useState("");
+  const [salesEndDate, setSalesEndDate] = useState("");
+  const [salesType, setSalesType] = useState<SaleTypeFilter>("all");
   const [categoryName, setCategoryName] = useState("");
   const [supplierForm, setSupplierForm] = useState({ name: "", contact: "", phone: "", email: "", leadTimeDays: "1" });
 
@@ -137,6 +163,11 @@ export function InventoryApp() {
     if (user) void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    if (user) void loadSales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salesEndDate, salesPage, salesPageSize, salesSearch, salesStartDate, salesType, user]);
 
   async function apiRequest(path: string, body?: unknown) {
     const response = await fetch(path, {
@@ -166,10 +197,19 @@ export function InventoryApp() {
     setLoading(false);
   }
 
-  async function loadSales() {
+  async function loadSales(page = salesPage) {
     try {
-      const data = await apiRequest("/api/sales");
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(salesPageSize)
+      });
+      if (salesStartDate) params.set("startDate", salesStartDate);
+      if (salesEndDate) params.set("endDate", salesEndDate);
+      if (salesType !== "all") params.set("saleType", salesType);
+      if (salesSearch.trim()) params.set("search", salesSearch.trim());
+      const data = await apiRequest(`/api/sales?${params.toString()}`);
       setInvoices(data.invoices ?? []);
+      setSalesPagination(data.pagination ?? { page, pageSize: salesPageSize, total: data.invoices?.length ?? 0, totalPages: 1 });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load sales.");
     }
@@ -227,6 +267,37 @@ export function InventoryApp() {
         .includes(needle);
     });
   }, [posCategory, posSearch, products]);
+
+  const salesPageSummary = useMemo(() => {
+    return invoices.reduce(
+      (summary, sale) => {
+        const revenue = getSaleRevenue(sale);
+        summary.revenue += revenue;
+        summary.items += sale.items.reduce((total, item) => total + item.quantity, 0);
+        if (sale.sale_type === "pos") summary.pos += 1;
+        if (sale.sale_type === "wholesale") summary.wholesale += 1;
+        if (sale.payment_method.startsWith("VOIDED")) summary.voided += 1;
+        return summary;
+      },
+      { revenue: 0, items: 0, pos: 0, wholesale: 0, voided: 0 }
+    );
+  }, [invoices]);
+
+  const salesByDay = useMemo(() => {
+    const groups: Array<{ day: string; count: number; revenue: number; invoices: SaleInvoice[] }> = [];
+    for (const sale of invoices) {
+      const day = getSaleDayKey(sale.created_at);
+      const existing = groups.find((group) => group.day === day);
+      if (existing) {
+        existing.count += 1;
+        existing.revenue += getSaleRevenue(sale);
+        existing.invoices.push(sale);
+      } else {
+        groups.push({ day, count: 1, revenue: getSaleRevenue(sale), invoices: [sale] });
+      }
+    }
+    return groups;
+  }, [invoices]);
 
   async function handleAuth(event: FormEvent) {
     event.preventDefault();
@@ -412,6 +483,23 @@ export function InventoryApp() {
       setMessage(error instanceof Error ? error.message : "Unable to void transaction.");
     }
     setSaving(false);
+  }
+
+  function updateSalesFilter(patch: Partial<{ search: string; startDate: string; endDate: string; saleType: SaleTypeFilter; pageSize: number }>) {
+    if (patch.search !== undefined) setSalesSearch(patch.search);
+    if (patch.startDate !== undefined) setSalesStartDate(patch.startDate);
+    if (patch.endDate !== undefined) setSalesEndDate(patch.endDate);
+    if (patch.saleType !== undefined) setSalesType(patch.saleType);
+    if (patch.pageSize !== undefined) setSalesPageSize(patch.pageSize);
+    setSalesPage(1);
+  }
+
+  function clearSalesFilters() {
+    setSalesSearch("");
+    setSalesStartDate("");
+    setSalesEndDate("");
+    setSalesType("all");
+    setSalesPage(1);
   }
 
   function updateSaleLine(index: number, patch: Partial<SaleLine>) {
@@ -807,42 +895,113 @@ export function InventoryApp() {
 
         {tab === "sales" ? (
           <section className="rounded-lg border border-black/10 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-black/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-bold">Sales & Invoices</h2>
-                <p className="text-sm text-zinc-500">View previous POS and wholesale invoices.</p>
+            <div className="space-y-4 border-b border-black/10 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold">Sales & Invoices</h2>
+                  <p className="text-sm text-zinc-500">Search, filter by day, and page through POS and wholesale invoices.</p>
+                </div>
+                <button onClick={() => void loadSales()} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+                  <RefreshCw className="h-4 w-4" aria-hidden />
+                  Refresh
+                </button>
               </div>
-              <button onClick={() => void loadSales()} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
-                <RefreshCw className="h-4 w-4" aria-hidden />
-                Refresh
-              </button>
+              <div className="grid gap-3 lg:grid-cols-[1fr_150px_150px_150px_120px_auto]">
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden />
+                  <input className={inputClass("w-full pl-10")} placeholder="Search invoice, buyer, payment" value={salesSearch} onChange={(event) => updateSalesFilter({ search: event.target.value })} />
+                </label>
+                <label className="relative block">
+                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden />
+                  <input className={inputClass("w-full pl-10")} type="date" value={salesStartDate} onChange={(event) => updateSalesFilter({ startDate: event.target.value })} aria-label="Start date" />
+                </label>
+                <label className="relative block">
+                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden />
+                  <input className={inputClass("w-full pl-10")} type="date" value={salesEndDate} onChange={(event) => updateSalesFilter({ endDate: event.target.value })} aria-label="End date" />
+                </label>
+                <select className={inputClass("w-full")} value={salesType} onChange={(event) => updateSalesFilter({ saleType: event.target.value as SaleTypeFilter })} aria-label="Sale type">
+                  <option value="all">All sales</option>
+                  <option value="pos">POS only</option>
+                  <option value="wholesale">Wholesale only</option>
+                </select>
+                <select className={inputClass("w-full")} value={salesPageSize} onChange={(event) => updateSalesFilter({ pageSize: Number(event.target.value) })} aria-label="Rows per page">
+                  {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / page</option>)}
+                </select>
+                <button type="button" onClick={clearSalesFilters} className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+                  Clear
+                </button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-md border border-black/10 bg-paper p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Matching records</p>
+                  <p className="mt-1 text-xl font-black">{number(salesPagination.total)}</p>
+                </div>
+                <div className="rounded-md border border-black/10 bg-paper p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Page revenue</p>
+                  <p className="mt-1 text-xl font-black">{currency(salesPageSummary.revenue)}</p>
+                </div>
+                <div className="rounded-md border border-black/10 bg-paper p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Page items</p>
+                  <p className="mt-1 text-xl font-black">{number(salesPageSummary.items)}</p>
+                </div>
+                <div className="rounded-md border border-black/10 bg-paper p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Page mix</p>
+                  <p className="mt-1 text-sm font-bold">{salesPageSummary.pos} POS / {salesPageSummary.wholesale} wholesale / {salesPageSummary.voided} voided</p>
+                </div>
+              </div>
             </div>
-              <div className="divide-y divide-black/10">
-                {invoices.map((sale) => (
-                  <div key={sale.id} className="grid gap-3 p-4 hover:bg-paper sm:grid-cols-[1fr_auto] sm:items-center">
-                    <button type="button" onClick={() => { setInvoice(sale); setTab("invoice"); }} className="text-left">
-                      <p className="font-semibold">
-                        {sale.invoice_no}
-                        {sale.payment_method.startsWith("VOIDED") ? <span className="ml-2 rounded-md bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700">Voided</span> : null}
-                      </p>
-                      <p className="text-sm text-zinc-500">{sale.buyer_name} / {new Date(sale.created_at).toLocaleString("en-PH")}</p>
-                      <p className="mt-1 text-xs text-zinc-500">{sale.items.length} item(s) / {sale.payment_method}</p>
-                    </button>
-                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                      <strong className="mr-auto text-lg text-ink sm:mr-0">{currency(Number(sale.total))}</strong>
-                      <button type="button" onClick={() => { setInvoice(sale); setTab("invoice"); }} className="rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
-                        Receipt
-                      </button>
-                      {!sale.payment_method.startsWith("VOIDED") ? (
-                        <button type="button" onClick={() => void voidSale(sale)} className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:border-rose-300" disabled={saving}>
-                          Void
-                        </button>
-                      ) : null}
-                    </div>
+            <div className="divide-y divide-black/10">
+              {salesByDay.map((group) => (
+                <div key={group.day}>
+                  <div className="flex flex-col gap-1 bg-paper px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="font-bold">{group.day}</h3>
+                    <p className="text-sm text-zinc-600">{group.count} invoice(s) / {currency(group.revenue)}</p>
                   </div>
-                ))}
-                {!invoices.length ? <p className="p-4 text-sm text-zinc-500">No sales yet.</p> : null}
+                  <div className="divide-y divide-black/10">
+                    {group.invoices.map((sale) => (
+                      <div key={sale.id} className="grid gap-3 p-4 hover:bg-paper sm:grid-cols-[1fr_auto] sm:items-center">
+                        <button type="button" onClick={() => { setInvoice(sale); setTab("invoice"); }} className="text-left">
+                          <p className="font-semibold">
+                            {sale.invoice_no}
+                            <span className="ml-2 rounded-md bg-mint px-2 py-1 text-xs font-bold capitalize text-leaf">{sale.sale_type ?? "sale"}</span>
+                            {sale.payment_method.startsWith("VOIDED") ? <span className="ml-2 rounded-md bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700">Voided</span> : null}
+                          </p>
+                          <p className="text-sm text-zinc-500">{sale.buyer_name} / {new Date(sale.created_at).toLocaleString("en-PH")}</p>
+                          <p className="mt-1 text-xs text-zinc-500">{sale.items.length} line(s) / {sale.items.reduce((total, item) => total + item.quantity, 0)} item(s) / {sale.payment_method}</p>
+                        </button>
+                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                          <strong className="mr-auto text-lg text-ink sm:mr-0">{currency(Number(sale.total))}</strong>
+                          <button type="button" onClick={() => { setInvoice(sale); setTab("invoice"); }} className="rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+                            Receipt
+                          </button>
+                          {!sale.payment_method.startsWith("VOIDED") ? (
+                            <button type="button" onClick={() => void voidSale(sale)} className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:border-rose-300" disabled={saving}>
+                              Void
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {!invoices.length ? <p className="p-4 text-sm text-zinc-500">No sales found.</p> : null}
+            </div>
+            <div className="flex flex-col gap-3 border-t border-black/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-zinc-500">
+                Page {salesPagination.page} of {salesPagination.totalPages} / showing {invoices.length} of {number(salesPagination.total)}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <button type="button" onClick={() => setSalesPage((page) => Math.max(1, page - 1))} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf disabled:cursor-not-allowed disabled:opacity-50" disabled={salesPagination.page <= 1}>
+                  <ChevronLeft className="h-4 w-4" aria-hidden />
+                  Previous
+                </button>
+                <button type="button" onClick={() => setSalesPage((page) => Math.min(salesPagination.totalPages, page + 1))} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf disabled:cursor-not-allowed disabled:opacity-50" disabled={salesPagination.page >= salesPagination.totalPages}>
+                  Next
+                  <ChevronRight className="h-4 w-4" aria-hidden />
+                </button>
               </div>
+            </div>
           </section>
         ) : null}
 

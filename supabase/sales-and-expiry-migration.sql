@@ -63,6 +63,8 @@ create table if not exists wholesale_sale_items (
 );
 
 create index if not exists wholesale_sales_invoice_no_idx on wholesale_sales(invoice_no);
+create index if not exists wholesale_sales_created_at_idx on wholesale_sales(created_at desc);
+create index if not exists wholesale_sales_sale_type_created_at_idx on wholesale_sales(sale_type, created_at desc);
 create index if not exists wholesale_sale_items_sale_id_idx on wholesale_sale_items(sale_id);
 create index if not exists products_expiry_status_idx on products(status, expiry_date);
 
