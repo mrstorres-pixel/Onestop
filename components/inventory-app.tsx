@@ -1165,6 +1165,7 @@ function PosReceipt({ invoice }: { invoice: SaleInvoice }) {
         </div>
         <div className="my-3 border-t border-dashed border-black" />
         <p className="text-center">Thank you for shopping!</p>
+        <div className="h-16 print:h-24" aria-hidden />
       </div>
     </section>
   );
