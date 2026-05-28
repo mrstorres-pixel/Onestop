@@ -7,6 +7,44 @@ type SaleBodyItem = {
   unitPrice: number;
 };
 
+export async function GET() {
+  const user = await requireUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminSupabase) return NextResponse.json({ error: "Server database is not configured." }, { status: 500 });
+
+  const { data: sales, error: salesError } = await adminSupabase
+    .from("wholesale_sales")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (salesError) return NextResponse.json({ error: salesError.message }, { status: 400 });
+
+  const saleIds = (sales ?? []).map((sale) => sale.id);
+  const { data: items, error: itemsError } = saleIds.length
+    ? await adminSupabase.from("wholesale_sale_items").select("*").in("sale_id", saleIds)
+    : { data: [], error: null };
+
+  if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 400 });
+
+  return NextResponse.json({
+    invoices: (sales ?? []).map((sale) => ({
+      ...sale,
+      items: (items ?? [])
+        .filter((item) => item.sale_id === sale.id)
+        .map((item) => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          barcode: item.barcode,
+          expiry_date: item.expiry_date,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          subtotal: item.subtotal
+        }))
+    }))
+  });
+}
+
 export async function POST(request: Request) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

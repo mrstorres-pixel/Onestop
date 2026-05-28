@@ -17,6 +17,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  ShoppingCart,
   SlidersHorizontal,
   Tags,
   Trash2,
@@ -28,7 +29,7 @@ import type { AuditLogRow, CategoryRow, ProductRow, ProductStatus, SaleInvoice, 
 import { cn, currency, number } from "@/lib/utils";
 
 type StaffUser = { id: string; username: string; role: string };
-type Tab = "dashboard" | "products" | "sell" | "invoice" | "settings";
+type Tab = "dashboard" | "products" | "pos" | "sell" | "sales" | "invoice" | "settings";
 type ProductFilter = "all" | "low" | "expiring";
 
 type ProductForm = {
@@ -101,6 +102,7 @@ export function InventoryApp() {
   const [selectedProductId, setSelectedProductId] = useState("");
   const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm);
   const [saleLines, setSaleLines] = useState<SaleLine[]>([{ productId: "", quantity: "1", unitPrice: "0" }]);
+  const [posLines, setPosLines] = useState<SaleLine[]>([{ productId: "", quantity: "1", unitPrice: "0" }]);
   const [saleForm, setSaleForm] = useState({
     buyerName: "ONE STOP",
     buyerAddress: "",
@@ -109,6 +111,7 @@ export function InventoryApp() {
     vatRate: "0"
   });
   const [invoice, setInvoice] = useState<SaleInvoice | null>(null);
+  const [invoices, setInvoices] = useState<SaleInvoice[]>([]);
   const [categoryName, setCategoryName] = useState("");
   const [supplierForm, setSupplierForm] = useState({ name: "", contact: "", phone: "", email: "", leadTimeDays: "1" });
 
@@ -149,10 +152,20 @@ export function InventoryApp() {
       setSuppliers(data.suppliers ?? []);
       setLogs(data.logs ?? []);
       setExpiredToday(data.expiredToday ?? []);
+      await loadSales();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load inventory.");
     }
     setLoading(false);
+  }
+
+  async function loadSales() {
+    try {
+      const data = await apiRequest("/api/sales");
+      setInvoices(data.invoices ?? []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load sales.");
+    }
   }
 
   const metrics = useMemo(() => {
@@ -179,6 +192,10 @@ export function InventoryApp() {
     const vat = subtotal * (Number(saleForm.vatRate || 0) / 100);
     return { subtotal, vat, total: subtotal + vat };
   }, [saleForm.vatRate, saleLines]);
+
+  const posPreview = useMemo(() => {
+    return posLines.reduce((total, line) => total + Number(line.quantity || 0) * Number(line.unitPrice || 0), 0);
+  }, [posLines]);
 
   async function handleAuth(event: FormEvent) {
     event.preventDefault();
@@ -303,6 +320,7 @@ export function InventoryApp() {
           }))
       });
       setInvoice(data.invoice);
+      setInvoices((current) => [data.invoice, ...current]);
       setTab("invoice");
       setSaleLines([{ productId: "", quantity: "1", unitPrice: "0" }]);
       await loadData();
@@ -313,8 +331,53 @@ export function InventoryApp() {
     setSaving(false);
   }
 
+  async function createPosSale(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage("");
+    try {
+      const data = await apiRequest("/api/sales", {
+        buyerName: "Walk-in Customer",
+        buyerAddress: "",
+        buyerPhone: "",
+        paymentMethod: "Cash",
+        vatRate: 0,
+        items: posLines
+          .filter((line) => line.productId)
+          .map((line) => ({
+            productId: line.productId,
+            quantity: Number(line.quantity || 1),
+            unitPrice: Number(line.unitPrice || 0)
+          }))
+      });
+      setInvoice(data.invoice);
+      setInvoices((current) => [data.invoice, ...current]);
+      setPosLines([{ productId: "", quantity: "1", unitPrice: "0" }]);
+      await loadData();
+      setTab("invoice");
+      setMessage("POS sale completed and inventory deducted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to complete POS sale.");
+    }
+    setSaving(false);
+  }
+
   function updateSaleLine(index: number, patch: Partial<SaleLine>) {
     setSaleLines((current) =>
+      current.map((line, lineIndex) => {
+        if (lineIndex !== index) return line;
+        const next = { ...line, ...patch };
+        if (patch.productId) {
+          const product = products.find((item) => item.id === patch.productId);
+          next.unitPrice = String(product?.price ?? 0);
+        }
+        return next;
+      })
+    );
+  }
+
+  function updatePosLine(index: number, patch: Partial<SaleLine>) {
+    setPosLines((current) =>
       current.map((line, lineIndex) => {
         if (lineIndex !== index) return line;
         const next = { ...line, ...patch };
@@ -357,7 +420,9 @@ export function InventoryApp() {
   const nav = [
     ["dashboard", LayoutDashboard, "Dashboard"],
     ["products", Boxes, "Products"],
+    ["pos", ShoppingCart, "POS"],
     ["sell", ReceiptText, "Wholesale Sale"],
+    ["sales", ReceiptText, "Sales"],
     ["invoice", Printer, "Invoice"],
     ["settings", Settings, "Settings"]
   ] as const;
@@ -527,6 +592,53 @@ export function InventoryApp() {
           </div>
         ) : null}
 
+        {tab === "pos" ? (
+          <form onSubmit={createPosSale} className="grid gap-5 lg:grid-cols-[1fr_360px]">
+            <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold">Point of Sale</h2>
+                  <p className="text-sm text-zinc-500">Create walk-in sales and deduct inventory immediately.</p>
+                </div>
+                <ShoppingCart className="h-5 w-5 text-leaf" aria-hidden />
+              </div>
+              <div className="mt-5 space-y-3">
+                {posLines.map((line, index) => {
+                  const product = products.find((item) => item.id === line.productId);
+                  return (
+                    <div key={index} className="grid gap-2 rounded-md border border-black/10 p-3 md:grid-cols-[1fr_100px_130px_40px]">
+                      <select className={inputClass("w-full")} value={line.productId} onChange={(event) => updatePosLine(index, { productId: event.target.value })} required>
+                        <option value="">Select product</option>
+                        {products.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.stock})</option>)}
+                      </select>
+                      <input className={inputClass("w-full")} type="number" min="1" placeholder="Qty" value={line.quantity} onChange={(event) => updatePosLine(index, { quantity: event.target.value })} required />
+                      <input className={inputClass("w-full")} type="number" step="0.01" min="0" placeholder="Price" value={line.unitPrice} onChange={(event) => updatePosLine(index, { unitPrice: event.target.value })} required />
+                      <button type="button" onClick={() => setPosLines((current) => current.length > 1 ? current.filter((_, lineIndex) => lineIndex !== index) : current)} className="flex h-10 items-center justify-center rounded-md border border-black/10 text-zinc-500 hover:border-berry hover:text-berry" aria-label="Remove line">
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </button>
+                      {product ? <p className="text-xs text-zinc-500 md:col-span-4">Stock {product.stock} / Barcode {product.barcode ?? "-"} / Expiry {product.expiry_date ?? "-"}</p> : null}
+                    </div>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={() => setPosLines((current) => [...current, { productId: "", quantity: "1", unitPrice: "0" }])} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf sm:w-auto">
+                <Plus className="h-4 w-4" aria-hidden />
+                Add item
+              </button>
+            </section>
+            <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+              <h2 className="text-lg font-bold">Sale Summary</h2>
+              <div className="mt-5 space-y-2 border-t border-black/10 pt-4 text-sm">
+                <div className="flex justify-between text-lg"><span>Total</span><strong>{currency(posPreview)}</strong></div>
+              </div>
+              <button className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white hover:bg-emerald-700" disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <ShoppingCart className="h-4 w-4" aria-hidden />}
+                Complete sale
+              </button>
+            </aside>
+          </form>
+        ) : null}
+
         {tab === "sell" ? (
           <form onSubmit={createSale} className="grid gap-5 lg:grid-cols-[1fr_380px]">
             <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
@@ -589,6 +701,34 @@ export function InventoryApp() {
 
         {tab === "invoice" ? (
           <InvoiceView invoice={invoice} />
+        ) : null}
+
+        {tab === "sales" ? (
+          <section className="rounded-lg border border-black/10 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-black/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Sales & Invoices</h2>
+                <p className="text-sm text-zinc-500">View previous POS and wholesale invoices.</p>
+              </div>
+              <button onClick={() => void loadSales()} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+                <RefreshCw className="h-4 w-4" aria-hidden />
+                Refresh
+              </button>
+            </div>
+            <div className="divide-y divide-black/10">
+              {invoices.map((sale) => (
+                <button key={sale.id} onClick={() => { setInvoice(sale); setTab("invoice"); }} className="grid w-full gap-2 p-4 text-left hover:bg-paper sm:grid-cols-[1fr_auto] sm:items-center">
+                  <div>
+                    <p className="font-semibold">{sale.invoice_no}</p>
+                    <p className="text-sm text-zinc-500">{sale.buyer_name} / {new Date(sale.created_at).toLocaleString("en-PH")}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{sale.items.length} item(s)</p>
+                  </div>
+                  <strong className="text-lg text-ink">{currency(Number(sale.total))}</strong>
+                </button>
+              ))}
+              {!invoices.length ? <p className="p-4 text-sm text-zinc-500">No sales yet.</p> : null}
+            </div>
+          </section>
         ) : null}
 
         {tab === "settings" ? (
