@@ -104,7 +104,9 @@ export function InventoryApp() {
   const [selectedProductId, setSelectedProductId] = useState("");
   const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm);
   const [saleLines, setSaleLines] = useState<SaleLine[]>([{ productId: "", quantity: "1", unitPrice: "0" }]);
-  const [posLines, setPosLines] = useState<SaleLine[]>([{ productId: "", quantity: "1", unitPrice: "0" }]);
+  const [posLines, setPosLines] = useState<SaleLine[]>([]);
+  const [posSearch, setPosSearch] = useState("");
+  const [posCategory, setPosCategory] = useState("All");
   const [saleForm, setSaleForm] = useState({
     buyerName: "ONE STOP",
     buyerAddress: "",
@@ -209,6 +211,20 @@ export function InventoryApp() {
   const posPreview = useMemo(() => {
     return posLines.reduce((total, line) => total + Number(line.quantity || 0) * Number(line.unitPrice || 0), 0);
   }, [posLines]);
+
+  const posProducts = useMemo(() => {
+    const needle = posSearch.trim().toLowerCase();
+    return products.filter((product) => {
+      if (product.stock <= 0) return false;
+      if (posCategory !== "All" && product.categories?.name !== posCategory) return false;
+      if (!needle) return true;
+      return [product.name, product.barcode, product.categories?.name]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [posCategory, posSearch, products]);
 
   async function handleAuth(event: FormEvent) {
     event.preventDefault();
@@ -366,7 +382,7 @@ export function InventoryApp() {
       });
       setInvoice(data.invoice);
       setInvoices((current) => [data.invoice, ...current]);
-      setPosLines([{ productId: "", quantity: "1", unitPrice: "0" }]);
+      setPosLines([]);
       await loadData();
       setTab("invoice");
       setMessage("POS sale completed and inventory deducted.");
@@ -390,18 +406,33 @@ export function InventoryApp() {
     );
   }
 
-  function updatePosLine(index: number, patch: Partial<SaleLine>) {
-    setPosLines((current) =>
-      current.map((line, lineIndex) => {
-        if (lineIndex !== index) return line;
-        const next = { ...line, ...patch };
-        if (patch.productId) {
-          const product = products.find((item) => item.id === patch.productId);
-          next.unitPrice = String(product?.price ?? 0);
-        }
-        return next;
-      })
-    );
+  function addProductToPos(product: ProductRow) {
+    setPosLines((current) => {
+      const existing = current.find((line) => line.productId === product.id);
+      if (existing) {
+        return current.map((line) =>
+          line.productId === product.id
+            ? { ...line, quantity: String(Math.min(Number(line.quantity || 0) + 1, product.stock)) }
+            : line
+        );
+      }
+
+      return [...current, { productId: product.id, quantity: "1", unitPrice: String(product.price) }];
+    });
+  }
+
+  function updatePosQuantity(productId: string, nextQuantity: number) {
+    const product = products.find((item) => item.id === productId);
+    const quantity = Math.max(1, Math.min(nextQuantity, product?.stock ?? nextQuantity));
+    setPosLines((current) => current.map((line) => line.productId === productId ? { ...line, quantity: String(quantity) } : line));
+  }
+
+  function updatePosPrice(productId: string, nextPrice: string) {
+    setPosLines((current) => current.map((line) => line.productId === productId ? { ...line, unitPrice: nextPrice } : line));
+  }
+
+  function removePosLine(productId: string) {
+    setPosLines((current) => current.filter((line) => line.productId !== productId));
   }
 
   if (!user) {
@@ -608,45 +639,78 @@ export function InventoryApp() {
         ) : null}
 
         {tab === "pos" ? (
-          <form onSubmit={createPosSale} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
+          <form onSubmit={createPosSale} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]">
             <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold">Point of Sale</h2>
-                  <p className="text-sm text-zinc-500">Create walk-in sales and deduct inventory immediately.</p>
+                  <p className="text-sm text-zinc-500">Tap products to add them to the cart.</p>
                 </div>
                 <ShoppingCart className="h-5 w-5 text-leaf" aria-hidden />
               </div>
-              <div className="mt-5 space-y-3">
-                {posLines.map((line, index) => {
-                  const product = products.find((item) => item.id === line.productId);
+              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden />
+                  <input className={inputClass("h-11 w-full pl-10")} placeholder="Search product or barcode" value={posSearch} onChange={(event) => setPosSearch(event.target.value)} />
+                </label>
+                <select className={inputClass("h-11 w-full md:w-56")} value={posCategory} onChange={(event) => setPosCategory(event.target.value)}>
+                  <option>All</option>
+                  {categories.map((category) => <option key={category.id}>{category.name}</option>)}
+                </select>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                {posProducts.map((product) => {
+                  const inCart = posLines.find((line) => line.productId === product.id);
                   return (
-                    <div key={index} className="grid gap-2 rounded-md border border-black/10 p-3 sm:grid-cols-[1fr_92px_120px_44px] lg:grid-cols-[1fr_110px_150px_44px]">
-                      <select className={inputClass("h-11 w-full")} value={line.productId} onChange={(event) => updatePosLine(index, { productId: event.target.value })} required>
-                        <option value="">Select product</option>
-                        {products.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.stock})</option>)}
-                      </select>
-                      <input className={inputClass("h-11 w-full")} type="number" min="1" placeholder="Qty" value={line.quantity} onChange={(event) => updatePosLine(index, { quantity: event.target.value })} required />
-                      <input className={inputClass("h-11 w-full")} type="number" step="0.01" min="0" placeholder="Price" value={line.unitPrice} onChange={(event) => updatePosLine(index, { unitPrice: event.target.value })} required />
-                      <button type="button" onClick={() => setPosLines((current) => current.length > 1 ? current.filter((_, lineIndex) => lineIndex !== index) : current)} className="flex h-11 items-center justify-center rounded-md border border-black/10 text-zinc-500 hover:border-berry hover:text-berry" aria-label="Remove line">
-                        <Trash2 className="h-4 w-4" aria-hidden />
-                      </button>
-                      {product ? <p className="text-xs text-zinc-500 sm:col-span-4">Stock {product.stock} / Barcode {product.barcode ?? "-"} / Expiry {product.expiry_date ?? "-"}</p> : null}
+                    <button key={product.id} type="button" onClick={() => addProductToPos(product)} className={cn("min-h-32 rounded-lg border p-3 text-left shadow-sm active:scale-[0.99]", inCart ? "border-leaf bg-mint" : "border-black/10 bg-white hover:border-leaf")}>
+                      <span className="block text-sm font-bold leading-snug text-ink">{product.name}</span>
+                      <span className="mt-2 block text-xs text-zinc-500">{product.categories?.name ?? "Uncategorized"}</span>
+                      <span className="mt-3 flex items-end justify-between gap-2">
+                        <span className="text-lg font-black text-leaf">{currency(Number(product.price))}</span>
+                        <span className="rounded-md bg-paper px-2 py-1 text-xs font-bold text-zinc-600">{product.stock} left</span>
+                      </span>
+                      {inCart ? <span className="mt-2 block text-xs font-bold text-leaf">In cart: {inCart.quantity}</span> : null}
+                    </button>
+                  );
+                })}
+                {!posProducts.length ? <p className="col-span-full rounded-md bg-paper p-4 text-sm text-zinc-500">No available products found.</p> : null}
+              </div>
+            </section>
+            <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm md:sticky md:top-4 md:self-start">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold">Cart</h2>
+                <button type="button" onClick={() => setPosLines([])} className="text-sm font-semibold text-berry" disabled={!posLines.length}>Clear</button>
+              </div>
+              <div className="mt-4 max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                {posLines.map((line) => {
+                  const product = products.find((item) => item.id === line.productId);
+                  if (!product) return null;
+                  return (
+                    <div key={line.productId} className="rounded-md border border-black/10 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold leading-snug">{product.name}</p>
+                          <p className="mt-1 text-xs text-zinc-500">{currency(Number(line.unitPrice))} each</p>
+                        </div>
+                        <button type="button" onClick={() => removePosLine(line.productId)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-black/10 text-zinc-500 hover:border-berry hover:text-berry" aria-label="Remove item">
+                          <Trash2 className="h-4 w-4" aria-hidden />
+                        </button>
+                      </div>
+                      <div className="mt-3 grid grid-cols-[44px_1fr_44px] gap-2">
+                        <button type="button" onClick={() => updatePosQuantity(line.productId, Number(line.quantity) - 1)} className="h-11 rounded-md border border-black/10 text-lg font-bold">-</button>
+                        <input className={inputClass("h-11 w-full text-center font-bold")} type="number" min="1" max={product.stock} value={line.quantity} onChange={(event) => updatePosQuantity(line.productId, Number(event.target.value || 1))} />
+                        <button type="button" onClick={() => updatePosQuantity(line.productId, Number(line.quantity) + 1)} className="h-11 rounded-md border border-black/10 text-lg font-bold">+</button>
+                      </div>
+                      <input className={inputClass("mt-2 h-11 w-full")} type="number" step="0.01" min="0" value={line.unitPrice} onChange={(event) => updatePosPrice(line.productId, event.target.value)} aria-label="Unit price" />
                     </div>
                   );
                 })}
+                {!posLines.length ? <p className="rounded-md bg-paper p-4 text-sm text-zinc-500">Tap products to start a sale.</p> : null}
               </div>
-              <button type="button" onClick={() => setPosLines((current) => [...current, { productId: "", quantity: "1", unitPrice: "0" }])} className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf sm:w-auto">
-                <Plus className="h-4 w-4" aria-hidden />
-                Add item
-              </button>
-            </section>
-            <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm md:sticky md:top-4 md:self-start">
-              <h2 className="text-lg font-bold">Sale Summary</h2>
               <div className="mt-5 space-y-2 border-t border-black/10 pt-4 text-sm">
-                <div className="flex justify-between text-lg"><span>Total</span><strong>{currency(posPreview)}</strong></div>
+                <div className="flex justify-between text-xl"><span>Total</span><strong>{currency(posPreview)}</strong></div>
               </div>
-              <button className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-leaf px-4 text-sm font-semibold text-white hover:bg-emerald-700" disabled={saving}>
+              <button className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-leaf px-4 text-base font-semibold text-white hover:bg-emerald-700" disabled={saving || !posLines.length}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <ShoppingCart className="h-4 w-4" aria-hidden />}
                 Complete sale
               </button>
