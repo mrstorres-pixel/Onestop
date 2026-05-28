@@ -1,6 +1,31 @@
 insert into categories (name)
-values ('Consumable'), ('Non-consumable')
+values ('Consumable'), ('Non-consumable'), ('Drinks'), ('Canned Goods')
 on conflict (name) do nothing;
+
+alter table products add column if not exists emoji text;
+
+update products
+set emoji = case
+  when lower(name) like '%water%' then '💧'
+  when lower(name) like '%coffee%' then '☕'
+  when lower(name) like '%milk%' or lower(name) like '%cheese%' or lower(name) like '%yogurt%' then '🥛'
+  when lower(name) like '%coke%' or lower(name) like '%cola%' or lower(name) like '%soda%' or lower(name) like '%juice%' or lower(name) like '%drink%' then '🥤'
+  when lower(name) like '%chip%' or lower(name) like '%snack%' or lower(name) like '%cracker%' then '🍟'
+  when lower(name) like '%bread%' or lower(name) like '%bun%' then '🍞'
+  when lower(name) like '%sardine%' or lower(name) like '%tuna%' or lower(name) like '%fish%' then '🐟'
+  when lower(name) like '%noodle%' or lower(name) like '%ramen%' or lower(name) like '%pancit%' then '🍜'
+  when lower(name) like '%rice%' then '🍚'
+  when lower(name) like '%chicken%' then '🍗'
+  when lower(name) like '%beef%' or lower(name) like '%pork%' then '🥩'
+  when lower(name) like '%egg%' then '🥚'
+  when lower(name) like '%soap%' or lower(name) like '%shampoo%' then '🧴'
+  when lower(name) like '%tissue%' or lower(name) like '%napkin%' then '🧻'
+  when lower(name) like '%butane%' or lower(name) like '%gas%' then '🔥'
+  when lower(name) like '%candy%' or lower(name) like '%chocolate%' then '🍫'
+  when lower(name) like '%biscuit%' or lower(name) like '%cookie%' then '🍪'
+  else '🛒'
+end
+where emoji is null or emoji = '';
 
 create table if not exists wholesale_sales (
   id uuid primary key default uuid_generate_v4(),

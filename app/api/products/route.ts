@@ -31,6 +31,30 @@ function slugify(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 }
 
+function productEmoji(name: string) {
+  const value = name.toLowerCase();
+  if (value.includes("water")) return "💧";
+  if (value.includes("coffee")) return "☕";
+  if (value.includes("milk") || value.includes("cheese") || value.includes("yogurt")) return "🥛";
+  if (value.includes("coke") || value.includes("cola") || value.includes("soda") || value.includes("juice") || value.includes("drink")) return "🥤";
+  if (value.includes("chip") || value.includes("snack") || value.includes("cracker")) return "🍟";
+  if (value.includes("bread") || value.includes("bun")) return "🍞";
+  if (value.includes("sardine") || value.includes("tuna") || value.includes("fish")) return "🐟";
+  if (value.includes("noodle") || value.includes("ramen") || value.includes("pancit")) return "🍜";
+  if (value.includes("rice")) return "🍚";
+  if (value.includes("chicken")) return "🍗";
+  if (value.includes("beef") || value.includes("pork")) return "🥩";
+  if (value.includes("egg")) return "🥚";
+  if (value.includes("soap") || value.includes("shampoo")) return "🧴";
+  if (value.includes("tissue") || value.includes("napkin")) return "🧻";
+  if (value.includes("butane") || value.includes("gas")) return "🔥";
+  if (value.includes("candy") || value.includes("chocolate")) return "🍫";
+  if (value.includes("biscuit") || value.includes("cookie")) return "🍪";
+  if (value.includes("fruit") || value.includes("apple")) return "🍎";
+  if (value.includes("vegetable")) return "🥬";
+  return "🛒";
+}
+
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (error && typeof error === "object" && "message" in error) {
@@ -80,6 +104,7 @@ export async function POST(request: Request) {
       name,
       sku,
       barcode: barcode || null,
+      emoji: String(body.emoji ?? "").trim() || productEmoji(name),
       brand: String(body.brand ?? "").trim() || null,
       category_id: categoryId,
       supplier_id: supplierId,

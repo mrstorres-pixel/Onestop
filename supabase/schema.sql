@@ -41,6 +41,7 @@ create table products (
   id uuid primary key default uuid_generate_v4(),
   sku text not null unique,
   barcode text unique,
+  emoji text,
   name text not null,
   brand text,
   category_id uuid references categories(id),
@@ -105,7 +106,7 @@ create table audit_logs (
 );
 
 insert into categories (name)
-values ('Consumable'), ('Non-consumable')
+values ('Consumable'), ('Non-consumable'), ('Drinks'), ('Canned Goods')
 on conflict (name) do nothing;
 
 create index staff_sessions_token_hash_idx on staff_sessions(token_hash);

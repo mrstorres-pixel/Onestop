@@ -36,6 +36,7 @@ type ProductFilter = "all" | "low" | "expiring";
 type ProductForm = {
   id?: string;
   name: string;
+  emoji: string;
   categoryName: string;
   supplierName: string;
   barcode: string;
@@ -54,6 +55,7 @@ type SaleLine = {
 
 const emptyProductForm: ProductForm = {
   name: "",
+  emoji: "",
   categoryName: "Consumable",
   supplierName: "",
   barcode: "",
@@ -253,6 +255,7 @@ export function InventoryApp() {
     setProductForm({
       id: product.id,
       name: product.name,
+      emoji: product.emoji ?? "",
       categoryName: product.categories?.name ?? "Consumable",
       supplierName: product.suppliers?.name ?? "",
       barcode: product.barcode ?? "",
@@ -583,7 +586,7 @@ export function InventoryApp() {
                   <button key={product.id} onClick={() => editProduct(product)} className="w-full rounded-lg border border-black/10 bg-white p-3 text-left shadow-sm hover:border-leaf">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-semibold text-ink">{product.name}</p>
+                        <p className="font-semibold text-ink"><span className="mr-1">{product.emoji ?? "🛒"}</span>{product.name}</p>
                         <p className="mt-1 break-all text-xs text-zinc-500">{product.barcode ?? "No barcode"}</p>
                       </div>
                       <StatusPill status={getProductStatus(product)} />
@@ -618,7 +621,7 @@ export function InventoryApp() {
                     {filteredProducts.map((product) => (
                       <tr key={product.id} onClick={() => editProduct(product)} className="cursor-pointer border-t border-black/5 hover:bg-paper">
                         <td className="px-4 py-4">
-                          <p className="font-semibold">{product.name}</p>
+                          <p className="font-semibold"><span className="mr-1">{product.emoji ?? "🛒"}</span>{product.name}</p>
                           <p className="text-xs text-zinc-500">{product.barcode ?? "No barcode"}</p>
                         </td>
                         <td className="px-4 py-4">{product.categories?.name ?? "-"}</td>
@@ -663,7 +666,8 @@ export function InventoryApp() {
                   const inCart = posLines.find((line) => line.productId === product.id);
                   return (
                     <button key={product.id} type="button" onClick={() => addProductToPos(product)} className={cn("min-h-32 rounded-lg border p-3 text-left shadow-sm active:scale-[0.99]", inCart ? "border-leaf bg-mint" : "border-black/10 bg-white hover:border-leaf")}>
-                      <span className="block text-sm font-bold leading-snug text-ink">{product.name}</span>
+                      <span className="block text-3xl" aria-hidden>{product.emoji ?? "🛒"}</span>
+                      <span className="mt-2 block text-sm font-bold leading-snug text-ink">{product.name}</span>
                       <span className="mt-2 block text-xs text-zinc-500">{product.categories?.name ?? "Uncategorized"}</span>
                       <span className="mt-3 flex items-end justify-between gap-2">
                         <span className="text-lg font-black text-leaf">{currency(Number(product.price))}</span>
@@ -944,6 +948,7 @@ function ProductEditor({
       </div>
       <div className="mt-4 space-y-3">
         <input className={inputClass("w-full")} placeholder="Product name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+        <input className={inputClass("w-full")} placeholder="Emoji for POS tile, e.g. 🥤" value={form.emoji} onChange={(event) => setForm({ ...form, emoji: event.target.value })} maxLength={4} />
         <select className={inputClass("w-full")} value={form.categoryName} onChange={(event) => setForm({ ...form, categoryName: event.target.value })}>
           {categories.map((category) => <option key={category.id}>{category.name}</option>)}
           {!categories.length ? <><option>Consumable</option><option>Non-consumable</option></> : null}

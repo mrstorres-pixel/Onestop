@@ -21,6 +21,7 @@ export type ProductRow = {
   id: string;
   sku: string;
   barcode: string | null;
+  emoji: string | null;
   name: string;
   brand: string | null;
   category_id: string | null;
