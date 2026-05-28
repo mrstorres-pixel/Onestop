@@ -40,7 +40,7 @@ input {
 
 @media print {
   @page {
-    size: 58mm auto;
+    size: 58mm 220mm;
     margin: 2mm;
   }
 
