@@ -1136,7 +1136,7 @@ function PosReceipt({ invoice }: { invoice: SaleInvoice }) {
           Print
         </button>
       </div>
-      <div className="mx-auto w-[280px] font-mono text-sm text-black print:w-[72mm]">
+      <div className="mx-auto w-[220px] font-mono text-[12px] leading-tight text-black print:w-[48mm] print:text-[10px]">
         <div className="text-center">
           <p className="text-lg font-black">ONE STOP</p>
           <p>Official Sales Receipt</p>
@@ -1147,7 +1147,7 @@ function PosReceipt({ invoice }: { invoice: SaleInvoice }) {
         <div className="space-y-2">
           {invoice.items.map((item, index) => (
             <div key={`${item.product_id}-${index}`}>
-              <p className="font-bold">{item.product_name}</p>
+              <p className="break-words font-bold">{item.product_name}</p>
               <div className="flex justify-between gap-3">
                 <span>{item.quantity} x {currency(Number(item.unit_price))}</span>
                 <span>{currency(Number(item.subtotal))}</span>

@@ -40,8 +40,8 @@ input {
 
 @media print {
   @page {
-    size: 80mm auto;
-    margin: 4mm;
+    size: 58mm auto;
+    margin: 2mm;
   }
 
   body {
