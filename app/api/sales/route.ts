@@ -91,11 +91,13 @@ export async function POST(request: Request) {
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
   const invoiceNo = `DR-${Date.now().toString().slice(-8)}`;
+  const saleType = body.saleType === "pos" ? "pos" : "wholesale";
 
   const { data: sale, error: saleError } = await adminSupabase
     .from("wholesale_sales")
     .insert({
       invoice_no: invoiceNo,
+      sale_type: saleType,
       buyer_name: String(body.buyerName ?? "Walk-in buyer").trim(),
       buyer_address: String(body.buyerAddress ?? "").trim() || null,
       buyer_phone: String(body.buyerPhone ?? "").trim() || null,

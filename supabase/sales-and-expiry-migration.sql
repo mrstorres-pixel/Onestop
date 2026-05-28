@@ -30,6 +30,7 @@ where emoji is null or emoji = '';
 create table if not exists wholesale_sales (
   id uuid primary key default uuid_generate_v4(),
   invoice_no text not null unique,
+  sale_type text not null default 'wholesale',
   buyer_name text not null,
   buyer_address text,
   buyer_phone text,
@@ -41,6 +42,13 @@ create table if not exists wholesale_sales (
   created_by uuid references staff_users(id),
   created_at timestamptz not null default now()
 );
+
+alter table wholesale_sales add column if not exists sale_type text not null default 'wholesale';
+
+update wholesale_sales
+set sale_type = 'pos'
+where buyer_name = 'Walk-in Customer'
+  and sale_type = 'wholesale';
 
 create table if not exists wholesale_sale_items (
   id uuid primary key default uuid_generate_v4(),

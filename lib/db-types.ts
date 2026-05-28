@@ -74,6 +74,7 @@ export type SaleItem = {
 export type SaleInvoice = {
   id: string;
   invoice_no: string;
+  sale_type: "pos" | "wholesale" | null;
   buyer_name: string;
   buyer_address: string | null;
   buyer_phone: string | null;

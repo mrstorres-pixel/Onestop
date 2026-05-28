@@ -39,6 +39,11 @@ input {
 }
 
 @media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+
   body {
     background: #ffffff;
   }

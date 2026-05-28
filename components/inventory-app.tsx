@@ -342,6 +342,7 @@ export function InventoryApp() {
     setMessage("");
     try {
       const data = await apiRequest("/api/sales", {
+        saleType: "wholesale",
         ...saleForm,
         vatRate: Number(saleForm.vatRate || 0),
         items: saleLines
@@ -370,6 +371,7 @@ export function InventoryApp() {
     setMessage("");
     try {
       const data = await apiRequest("/api/sales", {
+        saleType: "pos",
         buyerName: "Walk-in Customer",
         buyerAddress: "",
         buyerPhone: "",
@@ -1026,6 +1028,10 @@ function InvoiceView({ invoice }: { invoice: SaleInvoice | null }) {
     );
   }
 
+  if (invoice.sale_type === "pos") {
+    return <PosReceipt invoice={invoice} />;
+  }
+
   const totalQty = invoice.items.reduce((total, item) => total + item.quantity, 0);
 
   return (
@@ -1114,6 +1120,51 @@ function InvoiceView({ invoice }: { invoice: SaleInvoice | null }) {
             ))}
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function PosReceipt({ invoice }: { invoice: SaleInvoice }) {
+  const totalQty = invoice.items.reduce((total, item) => total + item.quantity, 0);
+
+  return (
+    <section className="mx-auto max-w-sm bg-white p-3 shadow-sm print:max-w-none print:p-0 print:shadow-none">
+      <div className="no-print mb-4 flex justify-end">
+        <button onClick={() => window.print()} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white">
+          <Printer className="h-4 w-4" aria-hidden />
+          Print
+        </button>
+      </div>
+      <div className="mx-auto w-[280px] font-mono text-sm text-black print:w-[72mm]">
+        <div className="text-center">
+          <p className="text-lg font-black">ONE STOP</p>
+          <p>Official Sales Receipt</p>
+          <p>{new Date(invoice.created_at).toLocaleString("en-PH")}</p>
+          <p>Receipt: {invoice.invoice_no}</p>
+        </div>
+        <div className="my-3 border-t border-dashed border-black" />
+        <div className="space-y-2">
+          {invoice.items.map((item, index) => (
+            <div key={`${item.product_id}-${index}`}>
+              <p className="font-bold">{item.product_name}</p>
+              <div className="flex justify-between gap-3">
+                <span>{item.quantity} x {currency(Number(item.unit_price))}</span>
+                <span>{currency(Number(item.subtotal))}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="my-3 border-t border-dashed border-black" />
+        <div className="space-y-1">
+          <div className="flex justify-between"><span>Items</span><span>{totalQty}</span></div>
+          <div className="flex justify-between"><span>Subtotal</span><span>{currency(Number(invoice.subtotal))}</span></div>
+          <div className="flex justify-between"><span>VAT</span><span>{currency(Number(invoice.vat_amount))}</span></div>
+          <div className="flex justify-between text-base font-black"><span>TOTAL</span><span>{currency(Number(invoice.total))}</span></div>
+          <div className="flex justify-between"><span>Payment</span><span>{invoice.payment_method}</span></div>
+        </div>
+        <div className="my-3 border-t border-dashed border-black" />
+        <p className="text-center">Thank you for shopping!</p>
       </div>
     </section>
   );

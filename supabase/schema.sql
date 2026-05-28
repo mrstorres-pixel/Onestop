@@ -72,6 +72,7 @@ create table stock_movements (
 create table wholesale_sales (
   id uuid primary key default uuid_generate_v4(),
   invoice_no text not null unique,
+  sale_type text not null default 'wholesale',
   buyer_name text not null,
   buyer_address text,
   buyer_phone text,
