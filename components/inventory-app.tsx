@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BarChart3,
   Boxes,
+  ClipboardList,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -25,11 +26,11 @@ import {
 } from "lucide-react";
 import { MetricCard } from "@/components/metric-card";
 import { StatusPill } from "@/components/status-pill";
-import type { AuditLogRow, CategoryRow, ProductRow, ProductStatus, SaleInvoice, SupplierRow } from "@/lib/db-types";
+import type { AuditLogRow, CategoryRow, ProductRow, ProductStatus, SaleInvoice, StockMovementRow, SupplierRow } from "@/lib/db-types";
 import { cn, currency, number } from "@/lib/utils";
 
 type StaffUser = { id: string; username: string; role: string };
-type Tab = "dashboard" | "products" | "pos" | "sell" | "sales" | "invoice" | "settings";
+type Tab = "dashboard" | "products" | "pos" | "sell" | "sales" | "audit" | "invoice" | "settings";
 type ProductFilter = "all" | "low" | "expiring";
 
 type ProductForm = {
@@ -98,6 +99,7 @@ export function InventoryApp() {
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [logs, setLogs] = useState<AuditLogRow[]>([]);
+  const [movements, setMovements] = useState<StockMovementRow[]>([]);
   const [expiredToday, setExpiredToday] = useState<Array<{ id: string; name: string; expiry_date: string }>>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm);
@@ -153,6 +155,7 @@ export function InventoryApp() {
       setLogs(data.logs ?? []);
       setExpiredToday(data.expiredToday ?? []);
       await loadSales();
+      await loadAudit();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load inventory.");
     }
@@ -165,6 +168,16 @@ export function InventoryApp() {
       setInvoices(data.invoices ?? []);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load sales.");
+    }
+  }
+
+  async function loadAudit() {
+    try {
+      const data = await apiRequest("/api/audit");
+      setMovements(data.movements ?? []);
+      setLogs(data.logs ?? []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load audit records.");
     }
   }
 
@@ -216,6 +229,7 @@ export function InventoryApp() {
     setUser(null);
     setProducts([]);
     setLogs([]);
+    setMovements([]);
   }
 
   function editProduct(product: ProductRow) {
@@ -423,6 +437,7 @@ export function InventoryApp() {
     ["pos", ShoppingCart, "POS"],
     ["sell", ReceiptText, "Wholesale Sale"],
     ["sales", ReceiptText, "Sales"],
+    ["audit", ClipboardList, "Audit"],
     ["invoice", Printer, "Invoice"],
     ["settings", Settings, "Settings"]
   ] as const;
@@ -731,6 +746,67 @@ export function InventoryApp() {
           </section>
         ) : null}
 
+        {tab === "audit" ? (
+          <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+            <section className="rounded-lg border border-black/10 bg-white shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-black/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold">Stock Movements</h2>
+                  <p className="text-sm text-zinc-500">Every sale, expiry deduction, return, adjustment, and waste record.</p>
+                </div>
+                <button onClick={() => void loadAudit()} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-black/10 px-4 text-sm font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+                  <RefreshCw className="h-4 w-4" aria-hidden />
+                  Refresh
+                </button>
+              </div>
+              <div className="divide-y divide-black/10">
+                {movements.map((movement) => {
+                  const linkedInvoice = movement.reference ? invoices.find((item) => item.invoice_no === movement.reference) : null;
+                  return (
+                    <div key={movement.id} className="grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                      <div>
+                        <p className="font-semibold">{movement.products?.name ?? "Deleted product"}</p>
+                        <p className="text-sm text-zinc-500">{movement.type.toUpperCase()} / {movement.reason}</p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {new Date(movement.created_at).toLocaleString("en-PH")} / Ref: {movement.reference ?? "-"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 sm:justify-end">
+                        <span className={cn("rounded-md px-2 py-1 text-sm font-bold", movement.quantity >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>
+                          {movement.quantity > 0 ? "+" : ""}{movement.quantity}
+                        </span>
+                        {linkedInvoice ? (
+                          <button type="button" onClick={() => { setInvoice(linkedInvoice); setTab("invoice"); }} className="rounded-md border border-black/10 px-2 py-1 text-xs font-semibold text-zinc-700 hover:border-leaf hover:text-leaf">
+                            Receipt
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!movements.length ? <p className="p-4 text-sm text-zinc-500">No movements recorded yet.</p> : null}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-black/10 bg-white shadow-sm">
+              <div className="border-b border-black/10 p-4">
+                <h2 className="text-lg font-bold">System Logs</h2>
+                <p className="text-sm text-zinc-500">Administrative and system-level actions.</p>
+              </div>
+              <div className="divide-y divide-black/10">
+                {logs.map((log) => (
+                  <div key={log.id} className="p-4">
+                    <p className="font-semibold">{log.action}</p>
+                    <p className="text-sm text-zinc-500">{log.detail}</p>
+                    <p className="mt-1 text-xs text-zinc-400">{new Date(log.created_at).toLocaleString("en-PH")}</p>
+                  </div>
+                ))}
+                {!logs.length ? <p className="p-4 text-sm text-zinc-500">No logs recorded yet.</p> : null}
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         {tab === "settings" ? (
           <div className="grid gap-5 lg:grid-cols-2">
             <form onSubmit={saveCategory} className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
@@ -846,7 +922,7 @@ function InvoiceView({ invoice }: { invoice: SaleInvoice | null }) {
       <section className="rounded-lg border border-black/10 bg-white p-6 text-center shadow-sm">
         <ReceiptText className="mx-auto h-8 w-8 text-zinc-400" aria-hidden />
         <h2 className="mt-3 text-lg font-bold">No invoice selected</h2>
-        <p className="mt-1 text-sm text-zinc-500">Create a wholesale sale to generate a delivery receipt.</p>
+        <p className="mt-1 text-sm text-zinc-500">Create a POS or wholesale sale to generate a receipt.</p>
       </section>
     );
   }

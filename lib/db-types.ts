@@ -49,6 +49,17 @@ export type AuditLogRow = {
   created_at: string;
 };
 
+export type StockMovementRow = {
+  id: string;
+  product_id: string;
+  type: "sale" | "restock" | "adjustment" | "return" | "waste";
+  quantity: number;
+  reason: string;
+  reference: string | null;
+  created_at: string;
+  products?: { name: string; sku: string; barcode: string | null } | null;
+};
+
 export type SaleItem = {
   product_id: string;
   product_name: string;
